@@ -167,11 +167,14 @@ function parseMegaMillions(body) {
   // Jackpot and Drawing update separately, about an hour and a half apart after a draw. In that gap the
   // figures still describe the draw before, and pairing them with the new date would misdate them and
   // spread the sales estimate across two draws.
-  const day = (v) => (typeof v === 'string' ? v.slice(0, 10) : undefined);
-  const lastDrawDate = day(d.Drawing && d.Drawing.PlayDate);
+  // Undefined unless the text starts with a date, so two empty or junk fields never count as a match.
+  const day = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : undefined);
+  const drawPlayDate = d.Drawing && d.Drawing.PlayDate;
+  const lastDrawDate = day(drawPlayDate);
   const jackpotDraw = day(j.PlayDate);
   if (lastDrawDate === undefined || jackpotDraw !== lastDrawDate) {
-    throw new Error(`megamillions.com: jackpot figures are for ${JSON.stringify(jackpotDraw)}, the last draw is ${JSON.stringify(lastDrawDate)}`);
+    const show = (v) => JSON.stringify(day(v) ?? v);
+    throw new Error(`megamillions.com: jackpot figures are for ${show(j.PlayDate)}, the last draw is ${show(drawPlayDate)}`);
   }
   let nextDrawAt;
   try {
@@ -345,39 +348,100 @@ function loadJackpotsScript(text) {
   return window.JACKPOTS;
 }
 
+// Draw weekdays, Sunday = 0: Powerball Mon/Wed/Sat, Mega Millions Tue/Fri. A draw the lotteries move, for a
+// holiday, would be refused as a skipped draw: that game keeps its last good figures and the run goes red
+// until this is updated, which is the safe way round.
+const DRAW_DAYS = { powerball: [1, 3, 6], megamillions: [2, 5] };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * A draw date as the sites write it, Mega Millions' "2026-10-06" or Powerball's "Wed, Oct 7, 2026", as
+ * "YYYY-MM-DD". Throws on anything else, including a date that does not exist.
+ */
+function calendarDate(text) {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  const us = /^(?:[A-Z][a-z]{2}, )?([A-Z][a-z]{2}) (\d{1,2}), (\d{4})$/.exec(text);
+  const [y, m, d] = iso ? [+iso[1], +iso[2], +iso[3]] : us ? [+us[3], MONTHS.indexOf(us[1]) + 1, +us[2]] : [];
+  const t = Date.UTC(y, m - 1, d);
+  const out = Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 10);
+  if (!out || m < 1 || out !== `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`) throw new Error(`not a date: ${JSON.stringify(text)}`);
+  return out;
+}
+
+/** The New York calendar date of an ISO instant, as "YYYY-MM-DD". */
+function easternDate(instant) {
+  const p = Object.fromEntries(EASTERN.formatToParts(new Date(instant)).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month.padStart(2, '0')}-${p.day.padStart(2, '0')}`;
+}
+
+/** The first scheduled draw date strictly after `date` ("YYYY-MM-DD"), for this game. */
+function drawAfter(gameId, date) {
+  const start = Date.parse(`${date}T00:00:00Z`);
+  for (let i = 1; i <= 7; i++) {
+    const t = new Date(start + i * 864e5);
+    if (DRAW_DAYS[gameId].includes(t.getUTCDay())) return t.toISOString().slice(0, 10);
+  }
+  throw new Error(`${gameId} has no draw days`);
+}
+
+/**
+ * Throws, naming the field, when one game's figures could not be published: they fail checkFigures, a date or
+ * stamp the page prints is missing or malformed, or the next draw is not the scheduled draw straight after the
+ * last one. That last rule catches figures stuck on an old draw while the countdown has moved on, which a
+ * check against the clock alone accepts. Dates are compared as New York calendar dates.
+ * Returns checkFigures' record. main() runs this on every fresh record, so anything it refuses is a failed
+ * fetch for that game, never a file the workflow's check then rejects whole.
+ * nextDrawAt may be absent, since files written before it existed have none; the date text is still checked.
+ */
+function checkGameRecord(id, g) {
+  const bad = (why) => {
+    throw new Error(why);
+  };
+  const record = checkFigures(id, g);
+  if (!isIsoInstant(g.fetchedAt)) bad(`fetchedAt: not an ISO instant: ${JSON.stringify(g.fetchedAt)}`);
+  if (g.nextDrawAt !== undefined && !isIsoInstant(g.nextDrawAt)) bad(`nextDrawAt: not an ISO instant: ${JSON.stringify(g.nextDrawAt)}`);
+  const dates = {};
+  for (const k of ['lastDrawDate', 'nextDrawDate']) {
+    try {
+      dates[k] = calendarDate(g[k]);
+    } catch (e) {
+      bad(`${k}: ${e.message}`);
+    }
+  }
+  if (g.nextDrawAt !== undefined && easternDate(g.nextDrawAt) !== dates.nextDrawDate) {
+    bad(`nextDrawDate ${dates.nextDrawDate} is not the New York date of nextDrawAt ${g.nextDrawAt}, which is ${easternDate(g.nextDrawAt)}`);
+  }
+  const expected = drawAfter(id, dates.lastDrawDate);
+  if (dates.nextDrawDate !== expected) {
+    bad(`the next draw is ${dates.nextDrawDate}, but the draw after ${dates.lastDrawDate} is ${expected}: the figures are for an older draw, or the site skipped one`);
+  }
+  const sold = g.estimatedTicketsSold;
+  if (!(sold == null || (Number.isFinite(sold) && sold > 0))) bad(`estimatedTicketsSold: not a number or null: ${JSON.stringify(sold)}`);
+  if (g.lastError !== undefined && typeof g.lastError !== 'string') bad('lastError: not text');
+  if (g.prizeTableDrift !== undefined && !(Array.isArray(g.prizeTableDrift) && g.prizeTableDrift.every((s) => typeof s === 'string'))) {
+    bad('prizeTableDrift: not a list of text');
+  }
+  return record;
+}
+
 /**
  * Throws, naming the game and field, when index.html could not show this data: every game present, each
- * either an error message or figures that pass checkFigures with the dates and stamps the page prints.
- * nextDrawAt may be absent, since files written before it existed have none.
+ * either an error message or a record that passes checkGameRecord.
  */
 function checkJackpotsData(data) {
   if (!data || typeof data.games !== 'object' || data.games === null) throw new Error('jackpots.js: no games');
   if (!isIsoInstant(data.fetchedAt)) throw new Error(`jackpots.js: fetchedAt: not an ISO instant: ${JSON.stringify(data.fetchedAt)}`);
   for (const id of GAME_IDS) {
     const g = data.games[id];
-    const bad = (why) => {
-      throw new Error(`jackpots.js: ${id}: ${why}`);
-    };
-    if (!g || typeof g !== 'object') bad('missing');
-    if ('error' in g) {
-      if (typeof g.error !== 'string') bad('error: not text');
-      continue;
-    }
     try {
-      checkFigures(id, g);
+      if (!g || typeof g !== 'object') throw new Error('missing');
+      if ('error' in g) {
+        if (typeof g.error !== 'string') throw new Error('error: not text');
+        continue;
+      }
+      checkGameRecord(id, g);
     } catch (e) {
-      bad(e.message);
-    }
-    if (!isIsoInstant(g.fetchedAt)) bad(`fetchedAt: not an ISO instant: ${JSON.stringify(g.fetchedAt)}`);
-    if (g.nextDrawAt !== undefined && !isIsoInstant(g.nextDrawAt)) bad(`nextDrawAt: not an ISO instant: ${JSON.stringify(g.nextDrawAt)}`);
-    for (const k of ['lastDrawDate', 'nextDrawDate']) {
-      if (typeof g[k] !== 'string' || g[k] === '') bad(`${k}: not a date: ${JSON.stringify(g[k])}`);
-    }
-    const sold = g.estimatedTicketsSold;
-    if (!(sold == null || (Number.isFinite(sold) && sold > 0))) bad(`estimatedTicketsSold: not a number or null: ${JSON.stringify(sold)}`);
-    if (g.lastError !== undefined && typeof g.lastError !== 'string') bad('lastError: not text');
-    if (g.prizeTableDrift !== undefined && !(Array.isArray(g.prizeTableDrift) && g.prizeTableDrift.every((s) => typeof s === 'string'))) {
-      bad('prizeTableDrift: not a list of text');
+      throw new Error(`jackpots.js: ${id}: ${e.message}`);
     }
   }
 }
@@ -418,21 +482,40 @@ const oneLine = (text) => String(text).replace(/[\r\n]+/g, ' ');
  *   file   the jackpots.js to read the previous run from and write this one to
  *   now    the run's time: stamps the figures and decides whether a draw has already happened
  *   log    (line) => void, given one line at a time with CR and LF already removed
+ * A crash part way (the file cannot be written, say) is logged and returns the fetch-failed bit, plus the
+ * drift bit if drift was found before it, so the workflow still reports both.
  */
-async function main({
+async function main(options = {}) {
+  const log = options.log || ((line) => console.log(line));
+  const found = { drift: [] };
+  try {
+    return await refresh({ ...options, log }, found);
+  } catch (e) {
+    log(oneLine(`FAILED: ${e.message}`));
+    return EXIT.fetchFailed | (found.drift.length ? EXIT.drift : 0);
+  }
+}
+
+/** main() without the crash handling. Records any drift in `found.drift` as soon as it is known. */
+async function refresh({
   fetch = globalThis.fetch,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   file = path.join(__dirname, 'jackpots.js'),
   now = new Date(),
-  log = (line) => console.log(line),
-} = {}) {
+  log,
+}, found) {
   const { estimateTicketsSold, PAYOUTS } = require('./roi.js');
   const { GAMES } = require('./prng.js');
   const say = (text) => log(oneLine(text));
   const deps = { fetch, sleep };
   const previous = readPrevious(fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
   const stamp = now.toISOString();
-  let drift = [];
+  // The same check the workflow runs on the whole file, so a record it would reject fails this game alone
+  // and keeps its last good figures, instead of stopping the commit and deploy for both.
+  const publishable = (id, record) => {
+    const { fetchedAt, ...checked } = checkGameRecord(id, { ...record, fetchedAt: stamp });
+    return checked;
+  };
 
   // Each game is fetched independently: one site breaking still updates the other.
   const outcomes = {
@@ -440,13 +523,14 @@ async function main({
       const pb = await fetchPowerball(deps);
       const record = { ...pb, estimatedTicketsSold: estimateTicketsSold('powerball', pb.last.cash, pb.next.cash) };
       refusePastDraw(record, now);
-      return checkFigures('powerball', record);
+      return publishable('powerball', record);
     }),
     megamillions: await attempt(async () => {
       const mm = await fetchMegaMillions(deps);
       if (!mm.jackpotVerified) say('megamillions: warning: the site has not marked these jackpot figures verified; publishing them anyway');
       // Before the figure checks, so a changed table turns the run red even when the figures are refused.
-      drift = megaMillionsTableDrift(mm, PAYOUTS, GAMES);
+      const drift = megaMillionsTableDrift(mm, PAYOUTS, GAMES);
+      found.drift = drift;
       if (drift.length) {
         say('megamillions: warning: the prize table or ball ranges have changed; update roi.js and prng.js:');
         for (const line of drift) say(`megamillions:   ${line}`);
@@ -463,7 +547,7 @@ async function main({
         prizeTableDrift: drift,
       };
       refusePastDraw(record, now);
-      return checkFigures('megamillions', record);
+      return publishable('megamillions', record);
     }),
   };
 
@@ -481,15 +565,19 @@ async function main({
   }
   say(`wrote ${file}`);
   const failed = Object.values(outcomes).some((o) => !o.ok);
-  return (failed ? EXIT.fetchFailed : 0) | (drift.length ? EXIT.drift : 0);
+  return (failed ? EXIT.fetchFailed : 0) | (found.drift.length ? EXIT.drift : 0);
 }
 
 module.exports = {
   URLS, parseDollars, parsePowerballHome, parsePowerballLastDraw, combinePowerball, parseMegaMillions, megaMillionsTableDrift,
-  easternWallTime, checkFigures, refusePastDraw, readPrevious, loadJackpotsScript, checkJackpotsData, mergeGame, main,
+  easternWallTime, checkFigures, checkGameRecord, refusePastDraw, readPrevious, loadJackpotsScript, checkJackpotsData, mergeGame, main,
 };
 if (require.main === module) {
+  // main() handles its own crashes; this catches only what escapes it, and still exits with the failed bit.
   main({ file: process.argv[2] ? path.resolve(process.argv[2]) : undefined }).then((code) => {
     process.exitCode = code;
+  }).catch((e) => {
+    console.log(oneLine(`FAILED: ${e && e.message}`));
+    process.exitCode = EXIT.fetchFailed;
   });
 }

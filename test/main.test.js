@@ -155,16 +155,64 @@ test('figures for a draw that has already happened are refused', async () => {
 
 test('a run across the end of daylight time reads the Mega Millions draw at the right hour', async () => {
   // Tuesday 2026-11-03, 11 PM EST, is 04:00 UTC. Read with October's offset it would be 03:00 and refused here.
-  const after = mmWith((d) => { d.NextDrawingDate = '2026-11-03T23:00:00'; });
+  const lastDraw = (d, date) => { d.Drawing.PlayDate = `${date}T00:00:00`; d.Jackpot.PlayDate = `${date}T00:00:00`; };
+  const after = mmWith((d) => { lastDraw(d, '2026-10-30'); d.NextDrawingDate = '2026-11-03T23:00:00'; });
   const tuesday = await run({ now: new Date('2026-11-04T03:30:00Z'), sites: { [URLS.megaMillions]: after } });
   assert.equal(tuesday.data.games.megamillions.error, undefined, tuesday.data.games.megamillions.error);
   assert.equal(tuesday.data.games.megamillions.nextDrawAt, '2026-11-04T04:00:00.000Z');
   const late = await run({ now: new Date('2026-11-04T04:00:00Z'), sites: { [URLS.megaMillions]: after } });
   assert.match(late.data.games.megamillions.error, /already happened/);
   // Friday 2026-10-30, 11 PM EDT, is 03:00 UTC. Read with November's offset it would still look ahead.
-  const before = mmWith((d) => { d.NextDrawingDate = '2026-10-30T23:00:00'; });
+  const before = mmWith((d) => { lastDraw(d, '2026-10-27'); d.NextDrawingDate = '2026-10-30T23:00:00'; });
   const friday = await run({ now: new Date('2026-10-31T03:30:00Z'), sites: { [URLS.megaMillions]: before } });
   assert.match(friday.data.games.megamillions.error, /next draw 2026-10-31T03:00:00.000Z has already happened/);
+});
+
+test('figures stuck on an old draw are refused even when the next draw time is current', async () => {
+  // Mega Millions: the figures and results both still describe Tuesday 9/29, while the next draw has moved
+  // on to Tuesday 10/13. The draw after 9/29 was Friday 10/2, so these figures are two weeks stale.
+  const stuck = mmWith((d) => {
+    d.Drawing.PlayDate = '2026-09-29T00:00:00';
+    d.Jackpot.PlayDate = '2026-09-29T00:00:00';
+    d.NextDrawingDate = '2026-10-13T23:00:00';
+  });
+  const mm = await run({ now: new Date('2026-10-10T10:23:00Z'), sites: { [URLS.megaMillions]: stuck } });
+  assert.equal(mm.code, 1);
+  assert.match(mm.data.games.megamillions.error, /the next draw is 2026-10-13, but the draw after 2026-09-29 is 2026-10-02/);
+
+  // Powerball: both pages still on Wednesday 10/7, the countdown on Monday 10/12, so Saturday's draw is missing.
+  const monday = fixture('powerball-home.html')
+    .replace('2026-10-11T02:59:00.0000000Z', '2026-10-13T02:59:00.0000000Z')
+    .replace('Sat, Oct 10, 2026', 'Mon, Oct 12, 2026');
+  const pb = await run({ now: new Date('2026-10-11T10:23:00Z'), sites: { [URLS.powerballHome]: monday } });
+  assert.match(pb.data.games.powerball.error, /the next draw is 2026-10-12, but the draw after 2026-10-07 is 2026-10-10/);
+});
+
+test('a record the page could not show is a failed fetch for that game, not a failed run', async () => {
+  // The next-drawing title holding only whitespace. Left to the workflow's file check, it would stop the
+  // commit and the deploy for both games, every day; here Powerball keeps its last good figures.
+  const first = await run();
+  const blank = fixture('powerball-home.html').replace('Sat, Oct 10, 2026', '   ');
+  const { code, data } = await run({ previous: first.text, now: LATER, sites: { [URLS.powerballHome]: blank } });
+  assert.equal(code, 1);
+  assert.match(data.games.powerball.lastError, /nextDrawDate: not a date: ""/);
+  assert.equal(data.games.powerball.fetchedAt, SAVED.toISOString());
+  assert.equal(data.games.megamillions.fetchedAt, LATER.toISOString());
+  assert.doesNotThrow(() => checkJackpotsData(data));
+});
+
+test('a crash still returns the fetch-failed bit, and the drift found before it', async () => {
+  // Writing into a directory that does not exist; the path carries a planted newline into the error text.
+  const file = path.join(os.tmpdir(), 'seeded-lottery-missing-\n::error::p', 'jackpots.js');
+  const lines = [];
+  const call = (mm) => main({
+    fetch: async (url) => new Response(url === URLS.megaMillions ? mm : fixture(url === URLS.powerballHome ? 'powerball-home.html' : 'powerball-latest-draw.html')),
+    sleep: async () => {}, file, now: SAVED, log: (line) => lines.push(line),
+  });
+  assert.equal(await call(fixture('megamillions-latest.json')), 1);
+  assert.equal(await call(mmWith((d) => { d.PrizeMatrix.WhiteBallMax = 69; })), 3);
+  assert.ok(lines.some((l) => /^FAILED: ENOENT/.test(l)), lines.join('\n'));
+  for (const line of lines) assert.doesNotMatch(line, /[\r\n]/, JSON.stringify(line));
 });
 
 test('a site that fails twice and then answers is a good fetch', async () => {
