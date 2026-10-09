@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Seeded Lottery</title>
+<style>
+  /* One set of tokens for the whole page: colour, type, space, radius. Dark mode only swaps colours. */
+  :root {
+    --bg: #f4efe5;
+    --glow-1: rgba(210, 43, 60, .10);
+    --glow-2: rgba(239, 182, 39, .16);
+    --card: #fffdf9;
+    --sunken: #f7f3ea;
+    --ink: #1d1a15;
+    --muted: #5f594e;
+    --line: #e6dfd0;
+    --line-strong: #cbc1ad;
+    --accent: #2c43b8;
+    --accent-soft: rgba(44, 67, 184, .09);
+    --focus: #2c43b8;
+    --pb-text: #a51626;
+    --mm-text: #835c00;
+    --loss: #b3261e;
+    --gain: #1d7a3a;
+    --warn-bg: #fff4d6; --warn-line: #e2bd5c; --warn-ink: #5a4100;
+    --shadow-sm: 0 1px 2px rgba(48, 36, 12, .08);
+    --shadow: 0 1px 2px rgba(48, 36, 12, .05), 0 14px 32px -18px rgba(48, 36, 12, .28);
+
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --font-round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 28px; --t-2xl: clamp(36px, 7vw, 52px);
+    --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
+    --tap: 44px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12110e;
+      --glow-1: rgba(226, 58, 70, .13);
+      --glow-2: rgba(239, 182, 39, .08);
+      --card: #1c1a16;
+      --sunken: #15130f;
+      --ink: #f2ede3;
+      --muted: #aba395;
+      --line: #322e27;
+      --line-strong: #4d473c;
+      --accent: #a3b0ff;
+      --accent-soft: rgba(163, 176, 255, .12);
+      --focus: #a3b0ff;
+      --pb-text: #ff9090;
+      --mm-text: #f2c55a;
+      --loss: #ff8f82;
+      --gain: #7ed69a;
+      --warn-bg: #2a220f; --warn-line: #6b5520; --warn-ink: #f3d68a;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 36px -18px rgba(0, 0, 0, .7);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; color: var(--ink);
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(ellipse 60% 420px at 8% -80px, var(--glow-1), transparent 70%),
+      radial-gradient(ellipse 55% 420px at 96% -60px, var(--glow-2), transparent 70%);
+    background-repeat: no-repeat;
+    font: var(--t-md)/1.5 var(--font);
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: var(--s-6) var(--s-4) var(--s-7); }
+  h1, h2, h3 { font-family: var(--font-round); margin: 0; line-height: 1.15; }
+  p { margin: 0; }
+  code { font: .92em var(--font-mono); background: var(--sunken); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; overflow-wrap: anywhere; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: var(--s-5); box-shadow: var(--shadow);
+  }
+  .eyebrow {
+    display: block; font-size: var(--t-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 var(--s-2);
+  }
+  .hint { font-size: var(--t-sm); color: var(--muted); }
+  .error { color: var(--loss); font-weight: 600; }
+
+  /* ---------- Masthead ---------- */
+  .masthead { display: flex; flex-direction: column; gap: var(--s-2); margin-bottom: var(--s-5); }
+  .brand { display: flex; align-items: center; gap: var(--s-3); }
+  .logo { display: flex; flex: none; }
+  .logo .ball { --size: 30px; animation: none; }
+  .logo .ball + .ball { margin-left: -9px; }
+  h1 { font-size: var(--t-2xl); font-weight: 800; letter-spacing: -0.025em; }
+  .tagline { font-size: var(--t-lg); color: var(--muted); line-height: 1.35; }
+  .tagline strong { color: var(--ink); font-weight: 650; }
+
+  /* ---------- Seed hero ---------- */
+  .hero { padding: var(--s-5); }
+  .hero-label { font: 800 var(--t-lg)/1.2 var(--font-round); color: var(--ink); display: block; margin-bottom: var(--s-3); }
+  .seed-box { position: relative; }
+  textarea#seed {
+    display: block; width: 100%; resize: none; overflow: hidden;
+    min-height: 64px; padding: 14px 56px 14px var(--s-4);
+    font: 600 24px/1.3 var(--font-round); color: var(--ink); letter-spacing: -0.01em;
+    background: var(--sunken); border: 2px solid var(--line-strong); border-radius: var(--r-md);
+    transition: border-color .15s, background-color .15s;
+  }
+  textarea#seed::placeholder { color: var(--muted); font-weight: 500; opacity: 1; }
+  textarea#seed:focus { outline: none; border-color: var(--focus); background: var(--card); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .clear {
+    position: absolute; top: 10px; right: 10px; width: var(--tap); height: var(--tap);
+    display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-pill);
+    background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer;
+  }
+  .clear:hover { background: var(--line); color: var(--ink); }
+  .clear[hidden] { display: none; }
+  .hero .hint { margin-top: var(--s-2); }
+
+  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: var(--s-3); }
+  .chips-label { font-size: var(--t-sm); color: var(--muted); margin-right: var(--s-1); }
+  .chip {
+    display: inline-flex; align-items: center; gap: var(--s-2); min-height: 40px; max-width: 100%;
+    padding: 0 var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r-pill);
+    background: var(--card); color: var(--ink); font: 500 var(--t-sm)/1 var(--font); cursor: pointer;
+    transition: background-color .15s, border-color .15s, transform .1s;
+  }
+  .chip:hover { border-color: var(--ink); }
+  .chip:active { transform: translateY(1px); }
+  .chip.is-active { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .chip .chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 20ch; }
+  .chip .chip-key { color: var(--muted); }
+  .chip.is-active .chip-key { color: inherit; opacity: .75; }
+  .chip-date { padding-right: var(--s-1); cursor: default; }
+  .chip-date input {
+    font: 500 var(--t-sm)/1 var(--font); color: var(--ink); background: var(--sunken);
+    border: 1px solid var(--line); border-radius: var(--r-pill); padding: 6px 10px; min-height: 32px;
+  }
+  .chip-date.is-active input { background: var(--card); }
+
+  /* Settings */
+  /* Settings sit open on wide screens. On a phone they fold into one summary line under the seed. */
+  .settings-box { margin-top: var(--s-5); border-top: 1px solid var(--line); }
+  .settings-box > summary { display: none; }
+  .settings {
+    display: grid; gap: var(--s-4) var(--s-5); align-items: end;
+    grid-template-columns: max-content minmax(190px, 240px) minmax(110px, 150px) minmax(110px, 150px);
+    padding-top: var(--s-5);
+  }
+  .field > label, .field > .label { display: block; font-size: var(--t-sm); font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  input[type=number] {
+    width: 100%; min-height: var(--tap); font: 600 var(--t-md)/1 var(--font); color: var(--ink);
+    background: var(--sunken); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+    padding: 0 var(--s-3); font-variant-numeric: tabular-nums;
+  }
+  input[type=number]:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--card); }
+  .stepper { display: flex; align-items: stretch; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--sunken); overflow: hidden; }
+  .stepper:has(input:focus) { border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .stepper input { border: 0; border-radius: 0; background: transparent; text-align: center; width: 56px; min-height: 42px; padding: 0 2px; -moz-appearance: textfield; appearance: textfield; }
+  .stepper input:focus { box-shadow: none; }
+  .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper button {
+    flex: none; width: var(--tap); min-height: 42px; border: 0; background: transparent; color: var(--ink);
+    font: 600 20px/1 var(--font); cursor: pointer;
+  }
+  .stepper button:hover { background: var(--line); }
+  .stepper button:focus-visible { outline-offset: -3px; }
+  .affix { position: relative; }
+  .affix input { padding-right: 30px; }
+  .affix span { position: absolute; right: var(--s-3); top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; pointer-events: none; }
+
+  .toggle { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-1); padding: var(--s-1); border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--sunken); }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .toggle label {
+    display: grid; place-items: center; min-height: 34px; margin: 0; padding: 0 var(--s-3); border-radius: var(--r-sm);
+    font-size: var(--t-sm); font-weight: 600; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s;
+  }
+  .toggle label:hover { color: var(--ink); }
+  .toggle input:checked + label { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm), 0 0 0 1px var(--line); }
+  .toggle input:focus-visible + label { outline: 3px solid var(--focus); outline-offset: 0; }
+
+  .status {
+    display: flex; gap: var(--s-2); align-items: baseline; margin: var(--s-4) var(--s-1) 0;
+    font-size: var(--t-sm); color: var(--muted);
+  }
+  .status::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gain); transform: translateY(-1px); }
+  .status.stale { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); border-radius: var(--r-md); padding: var(--s-2) var(--s-3); margin-inline: 0; }
+  .status.stale::before { content: "!"; width: 18px; height: 18px; display: grid; place-items: center; background: var(--warn-ink); color: var(--warn-bg); font-weight: 800; font-size: 12px; transform: translateY(3px); }
+  .status.none::before { background: var(--line-strong); }
+
+  /* ---------- Games ---------- */
+  .games { display: grid; grid-template-columns: 1fr; gap: var(--s-5); margin-top: var(--s-5); }
+  @media (min-width: 760px) { .games { grid-template-columns: 1fr 1fr; } }
+  .game { display: flex; flex-direction: column; gap: var(--s-4); min-width: 0; position: relative; overflow: hidden; }
+  .game::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--tone-bar); }
+  .game[data-game=powerball] { --tone-bar: linear-gradient(90deg, #e23a46, #a8172a); --tone-text: var(--pb-text); }
+  .game[data-game=megamillions] { --tone-bar: linear-gradient(90deg, #f7cd4a, #d39a0c); --tone-text: var(--mm-text); }
+  .game-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-3); flex-wrap: wrap; }
+  .game-title { display: flex; align-items: center; gap: var(--s-3); }
+  .game-title .ball { --size: 28px; animation: none; }
+  .game h2 { font-size: var(--t-xl); font-weight: 800; letter-spacing: -0.02em; }
+  .jackpot { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+  .jackpot-amt { font: 800 var(--t-lg)/1.2 var(--font-round); font-variant-numeric: tabular-nums; }
+  .jackpot-sub { font-size: var(--t-xs); color: var(--muted); }
+  /* A narrow column puts the jackpot on its own line under the name rather than wrapping it ragged. */
+  .game { container: game / inline-size; }
+  @container game (max-width: 460px) {
+    .game-head { flex-direction: column; gap: var(--s-2); }
+    .jackpot { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s-2); text-align: left; }
+    .jackpot-amt { font-size: var(--t-md); }
+  }
+
+  /* Tickets. Ball size follows the column's width (container query units), so five balls and the bonus
+     ball always share one line, from a 375px phone up to a wide desktop column. */
+  .tickets { display: flex; flex-direction: column; gap: var(--s-2); container-type: inline-size; }
+  .ticket {
+    display: flex; align-items: center; gap: var(--s-2);
+    padding: 10px var(--s-3); border-radius: var(--r-md);
+    background: var(--sunken); border: 1px solid var(--line);
+  }
+  .ticket .n {
+    flex: none; width: 24px; text-align: right; color: var(--muted);
+    font: 600 var(--t-xs)/1 var(--font); font-variant-numeric: tabular-nums;
+  }
+  .tickets:not(.multi) .ticket .n { display: none; }
+  .ticket .balls { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+  .pool { display: flex; gap: 6px; }
+  .plus { flex: none; width: 10px; text-align: center; color: var(--muted); font-weight: 700; }
+
+  .ball {
+    --size: 34px;
+    --size: clamp(24px, calc((100cqi - 114px) / 6), 46px);
+    position: relative; flex: none; width: var(--size); height: var(--size); border-radius: 50%;
+    display: grid; place-items: center;
+    font: 800 calc(var(--size) * .42)/1 var(--font-round); font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+    color: #1d1a15;
+    background: radial-gradient(circle at 34% 28%, #ffffff 0 14%, #f6f3ec 38%, #ddd7ca 72%, #b7af9f 100%);
+    box-shadow:
+      inset -2px -3px 6px rgba(60, 45, 20, .22),
+      inset 1px 2px 3px rgba(255, 255, 255, .9),
+      0 1px 1px rgba(0, 0, 0, .12),
+      0 5px 9px -5px rgba(0, 0, 0, .45);
+    animation: drop .6s cubic-bezier(.25, 1.5, .5, 1) both;
+    animation-delay: var(--d, 0ms);
+  }
+  /* The specular highlight stays put while the number rolls under it. */
+  .ball::after {
+    content: ""; position: absolute; left: 17%; top: 9%; width: 38%; height: 24%; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 72%);
+    transform: rotate(-24deg); pointer-events: none;
+  }
+  .ball .num { position: relative; z-index: 1; display: block; animation: roll .6s cubic-bezier(.2, .8, .3, 1) both; animation-delay: var(--d, 0ms); }
+  .ball.red {
+    color: #fff; text-shadow: 0 1px 1px rgba(80, 0, 10, .55);
+    background: radial-gradient(circle at 34% 28%, #ff9d93 0 8%, #e8404c 32%, #c41f31 66%, #7c0c19 100%);
+    box-shadow: inset -2px -3px 7px rgba(60, 0, 8, .45), inset 1px 2px 3px rgba(255, 200, 200, .5), 0 1px 1px rgba(0, 0, 0, .15), 0 5px 9px -5px rgba(120, 0, 15, .6);
+  }
+  .ball.gold {
+    color: #2a1e00;
+    background: radial-gradient(circle at 34% 28%, #fff6cc 0 9%, #f9d55a 34%, #e7ad1c 68%, #9c6c04 100%);
+    box-shadow: inset -2px -3px 7px rgba(90, 55, 0, .4), inset 1px 2px 3px rgba(255, 245, 210, .7), 0 1px 1px rgba(0, 0, 0, .15), 0 5px 9px -5px rgba(110, 70, 0, .6);
+  }
+  .ball.ghost {
+    background: transparent; box-shadow: none; border: 2px dashed var(--line-strong); color: var(--muted);
+    animation: none; font-weight: 600;
+  }
+  .ball.ghost::after { display: none; }
+  .ticket.settled .ball, .ticket.settled .num { animation: none; }
+  @keyframes drop {
+    0% { transform: translateY(-70%) scale(.5); opacity: 0; }
+    35% { opacity: 1; }
+    100% { transform: none; opacity: 1; }
+  }
+  @keyframes roll { from { transform: rotate(-300deg) scale(.7); } to { transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ball, .ball .num { animation: none !important; }
+    * { transition: none !important; }
+  }
+  .empty-state { display: flex; flex-direction: column; gap: var(--s-2); }
+  .empty { color: var(--muted); font-size: var(--t-sm); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); font-size: var(--t-xs); color: var(--muted); margin-top: calc(-1 * var(--s-1)); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .ball { --size: 12px; animation: none; box-shadow: inset -1px -1px 2px rgba(0, 0, 0, .25), 0 0 0 1px rgba(0, 0, 0, .08); }
+  .legend .ball::after { display: none; }
+
+  /* ROI */
+  .roi { display: flex; flex-direction: column; gap: var(--s-4); padding-top: var(--s-4); border-top: 1px dashed var(--line-strong); }
+  .roi-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s-3); }
+  /* Subgrid lines the tiles' rows up, so a play name that wraps does not knock its figures out of line. */
+  .roi-tile {
+    background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-3) var(--s-4) var(--s-4);
+    display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 6px; align-content: start;
+  }
+  .roi-play { font-size: var(--t-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .roi-big { font: 800 40px/1 var(--font-round); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .roi-tile.loss .roi-big { color: var(--loss); }
+  .roi-tile.gain .roi-big { color: var(--gain); }
+  .roi-back { font-size: var(--t-sm); color: var(--muted); line-height: 1.35; }
+  .roi-back strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* A dollar: the solid part comes back on average, the hatched part does not. */
+  .meter {
+    height: 8px; border-radius: var(--r-pill); overflow: hidden; margin-top: 4px;
+    background: repeating-linear-gradient(-45deg, var(--line-strong) 0 3px, transparent 3px 7px);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+  .meter > span { display: block; height: 100%; background: var(--ink); border-radius: var(--r-pill) 0 0 var(--r-pill); }
+
+  .rows { display: grid; gap: 6px var(--s-4); font-size: var(--t-sm); align-items: baseline; }
+  .rows .k { color: var(--muted); }
+  .rows .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
+  .rows .h { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--muted); white-space: normal; max-width: 10ch; margin-left: auto; line-height: 1.25; }
+  .rows .sub { padding-left: var(--s-3); font-size: var(--t-xs); }
+  .rows .v.sub { padding-left: 0; font-weight: 500; color: var(--muted); }
+  .rows .rule { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 2px 0; }
+  .shared { font-size: var(--t-sm); color: var(--muted); }
+
+  details.assume { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunken); }
+  details.assume > summary {
+    list-style: none; display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+    min-height: var(--tap); padding: 0 var(--s-4); cursor: pointer; font-size: var(--t-sm); font-weight: 600; border-radius: var(--r-md);
+  }
+  details.assume > summary::-webkit-details-marker { display: none; }
+  details.assume > summary .muted { color: var(--muted); font-weight: 500; }
+  details.assume > summary::after {
+    content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s;
+  }
+  details.assume[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+  .assume-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); padding: 0 var(--s-4) var(--s-4); }
+  .assume-grid label { display: block; font-size: var(--t-xs); font-weight: 600; color: var(--muted); margin-bottom: var(--s-1); }
+  .assume-grid input { background: var(--card); }
+  .note { font-size: var(--t-xs); color: var(--muted); }
+
+  /* ---------- Seed check ---------- */
+  .seed { margin-top: var(--s-5); display: grid; grid-template-columns: 1fr auto; gap: var(--s-3) var(--s-5); align-items: center; }
+  .seed h2 { font-size: var(--t-lg); font-weight: 800; grid-column: 1 / -1; }
+  .seed-main { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+  .hash {
+    font: 500 var(--t-sm)/1.6 var(--font-mono); color: var(--ink);
+    background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-2) var(--s-3);
+  }
+  .hash span { display: inline-block; margin-right: .6ch; }
+  .hash span:nth-child(odd) { color: var(--muted); }
+  .actions { display: flex; flex-direction: column; gap: var(--s-2); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); padding: 0 var(--s-5);
+    font: 600 var(--t-sm)/1 var(--font); border-radius: var(--r-pill); cursor: pointer; white-space: nowrap;
+    border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); transition: background-color .15s, border-color .15s;
+  }
+  .btn:hover { border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .btn.primary:hover { opacity: .9; }
+
+  /* ---------- Fine print ---------- */
+  .fineprint { margin-top: var(--s-6); padding: 0 var(--s-1); color: var(--muted); font-size: var(--t-sm); }
+  .fineprint h2 { font-size: var(--t-md); color: var(--ink); margin-bottom: var(--s-3); }
+  .fineprint ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--s-3) var(--s-6); }
+  .fineprint li { padding-left: var(--s-4); position: relative; }
+  .fineprint li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+  .fineprint strong { color: var(--ink); font-weight: 650; }
+
+  /* ---------- Narrow screens ---------- */
+  @media (max-width: 759px) {
+    .settings { grid-template-columns: 1fr 1fr; }
+    .stepper input { width: 100%; }
+  }
+  @media (max-width: 560px) {
+    main { padding-top: var(--s-5); }
+    .card { padding: var(--s-4); border-radius: var(--r-md); }
+    .tagline { font-size: var(--t-md); }
+    textarea#seed { font-size: 20px; min-height: 56px; padding: 12px 52px 12px 14px; }
+    .clear { top: 6px; right: 6px; }
+    .settings { gap: var(--s-3); padding-top: var(--s-2); }
+    .settings-box { margin-top: var(--s-3); }
+    .settings-box > summary {
+      list-style: none; display: flex; align-items: center; gap: var(--s-3); min-height: 48px; cursor: pointer;
+      font-size: var(--t-sm); font-weight: 700; margin: 0 calc(-1 * var(--s-2)); padding: 0 var(--s-2); border-radius: var(--r-sm);
+    }
+    .settings-box > summary::-webkit-details-marker { display: none; }
+    .settings-box > summary::after {
+      content: ""; flex: none; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s;
+    }
+    .settings-box[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+    .settings-summary { color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .settings-box[open] .settings-summary { visibility: hidden; }
+    .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--s-4)); padding: 2px var(--s-4); scroll-padding-inline: var(--s-4); }
+    .chips::-webkit-scrollbar { display: none; }
+    .chips { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+    .chip { flex: none; }
+    textarea#seed:placeholder-shown { padding-right: 14px; }
+    .game h2 { font-size: var(--t-lg); }
+    .ticket { padding: 8px 10px; }
+    .roi-big { font-size: 32px; }
+    .roi-tile { padding: var(--s-3); }
+    .assume-grid { grid-template-columns: 1fr 1fr; padding: 0 var(--s-3) var(--s-3); }
+    .assume-grid > :last-child { grid-column: 1 / -1; }
+    details.assume > summary { padding: 0 var(--s-3); }
+    .seed { grid-template-columns: 1fr; }
+    .actions { flex-direction: row; }
+    .actions .btn { flex: 1; padding: 0 var(--s-3); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="masthead">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><span class="ball"></span><span class="ball red"></span><span class="ball gold"></span></span>
+      <h1>Seeded Lottery</h1>
+    </div>
+    <p class="tagline">Type anything. <strong>The same text always draws the same numbers.</strong></p>
+  </header>
+
+  <section class="card hero" aria-label="Seed and settings">
+    <label class="hero-label" for="seed">Your seed text</label>
+    <div class="seed-box">
+      <textarea id="seed" rows="1" placeholder="A date, a name, a sentence…" autocomplete="off" spellcheck="false" autofocus></textarea>
+      <button type="button" class="clear" id="clearSeed" aria-label="Clear seed text" hidden>×</button>
+    </div>
+    <div class="chips" role="group" aria-label="Fill in an example">
+      <span class="chips-label">Try</span>
+      <button type="button" class="chip" id="todayChip" data-fill=""><span class="chip-key">Today</span><span class="chip-text" id="todayText"></span></button>
+      <label class="chip chip-date" id="birthdayChip"><span class="chip-key">Birthday</span><input type="date" id="birthday"></label>
+      <button type="button" class="chip" data-fill="Hello, world"><span class="chip-text">“Hello, world”</span></button>
+      <button type="button" class="chip" data-fill="The quick brown fox jumps over the lazy dog"><span class="chip-text">“The quick brown fox jumps over the lazy dog”</span></button>
+    </div>
+    <p class="hint">Exact text: spaces and capitals count. "Hello" and "hello " draw differently.</p>
+
+    <details class="settings-box" id="settingsBox">
+    <summary><span>Settings</span><span class="settings-summary" id="settingsSummary"></span></summary>
+    <div class="settings">
+      <div class="field">
+        <label for="count">Tickets</label>
+        <div class="stepper">
+          <button type="button" id="countDown" aria-label="One ticket fewer">−</button>
+          <input id="count" type="number" min="1" max="100" value="1" inputmode="numeric">
+          <button type="button" id="countUp" aria-label="One ticket more">+</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label" id="payoutLabel">Take the jackpot as</span>
+        <div class="toggle" role="radiogroup" aria-labelledby="payoutLabel">
+          <input type="radio" name="payout" id="payout-cash" value="cash" checked><label for="payout-cash">Cash</label>
+          <input type="radio" name="payout" id="payout-annuity" value="annuity"><label for="payout-annuity">Annuity</label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fedTax">Federal tax</label>
+        <div class="affix"><input id="fedTax" type="number" min="0" max="99" step="0.1" value="37" placeholder="0" inputmode="decimal"><span aria-hidden="true">%</span></div>
+      </div>
+      <div class="field">
+        <label for="stateTax">State tax</label>
+        <div class="affix"><input id="stateTax" type="number" min="0" max="99" step="0.1" value="0" placeholder="0" inputmode="decimal"><span aria-hidden="true">%</span></div>
+      </div>
+    </div>
+    </details>
+  </section>
+
+  <p class="status" id="dataNote"></p>
+
+  <div class="games" id="games"></div>
+  <div id="seedOut"></div>
+
+  <footer class="fineprint">
+    <h2>How to read these numbers</h2>
+    <ul>
+      <li><strong>An average, not a forecast.</strong> ROI is the expected return on the ticket price: the average over every possible draw, not what any one ticket pays.</li>
+      <li><strong>Tax</strong> applies to every prize. <strong>The annuity</strong> is taken at face value, undiscounted, which overstates 30 payments over 29 years.</li>
+      <li><strong>Projected plays</strong> come from how much the lottery says the jackpot's cash value will grow (32.5% of each $2 Powerball play
+        and 27.63% of each $5 Mega Millions play fund it). The lotteries project low: recent Powerball draws sold about 10% more.</li>
+      <li><strong>Break-even jackpots</strong> hold sales at today's level; bigger jackpots sell more tickets and are shared more often, so the real
+        break-even is higher.</li>
+      <li><strong>Sharing.</strong> The chance of sharing assumes other players' numbers are random; real players favour birthdays, so
+        popular numbers share more often.</li>
+      <li><strong>California.</strong> In California every prize is pari-mutuel, so these fixed prizes don't apply there.</li>
+      <li><strong>Just for fun.</strong> Not affiliated with Powerball, Mega Millions or any lottery. Numbers drawn here are no more
+        likely to win than any others, and your text never leaves your device. If gambling stops being fun, call or text
+        1-800-GAMBLER.</li>
+    </ul>
+  </footer>
+</main>
+
+<script src="prng.js"></script>
+<script src="roi.js"></script>
+<!-- Written by fetch-jackpots.js. Missing is fine: the jackpot fields are then left for you to fill in. -->
+<script src="jackpots.js"></script>
+<script>
+  'use strict';
+  const { GAMES, jackpotOdds, generate } = window.SeededLottery;
+  const { expectedReturn, PAYOUTS } = window.LotteryRoi;
+  const DATA = window.JACKPOTS || null;
+  const GAME_IDS = ['powerball', 'megamillions'];
+  // The ways to play each game, priced side by side.
+  const PLAYS = { powerball: ['powerball', 'powerballPowerPlay'], megamillions: ['megamillions'] };
+  const PLAY_NAMES = { powerball: '$2 play', powerballPowerPlay: '$3 with Power Play', megamillions: '$5 play' };
+  // The bonus ball's finish. The colour is decoration: the "+" before it, its position and the legend name it too.
+  const BONUS_FINISH = { powerball: 'red', megamillions: 'gold' };
+  const $ = (id) => document.getElementById(id);
+  // Opened from disk or a local server, the reader can run the fetch; on the hosted site a daily job does.
+  const LOCAL = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  const REFRESH_HINT = LOCAL ? ' Run <code>node fetch-jackpots.js</code> to refresh.' : ' They refresh every morning.';
+
+  // One column per game. Built once; render() fills in what changes.
+  for (const id of GAME_IDS) {
+    const g = GAMES[id];
+    $('games').insertAdjacentHTML('beforeend', `
+      <section class="card game" data-game="${id}" aria-labelledby="${id}-title">
+        <header class="game-head">
+          <div class="game-title">
+            <span class="ball ${BONUS_FINISH[id]}" aria-hidden="true"></span>
+            <h2 id="${id}-title">${escapeHtml(g.name)}</h2>
+          </div>
+          <div class="jackpot" aria-live="polite">
+            <span class="jackpot-amt" id="${id}-jp"></span>
+            <span class="jackpot-sub" id="${id}-jpsub"></span>
+          </div>
+        </header>
+        <div class="tickets" id="${id}-tickets"></div>
+        <div class="legend">${g.pools.map((p, i) => `<span><span class="ball${i ? ` ${BONUS_FINISH[id]}` : ''}" aria-hidden="true"></span>${escapeHtml(p.label)}: ${p.count} of 1–${p.max}</span>`).join('')}
+          <span>Jackpot: 1 in ${jackpotOdds(g).toLocaleString('en-US')}</span></div>
+        <div class="roi">
+          <span class="eyebrow" style="margin:0">ROI per ticket, after tax</span>
+          <div id="${id}-roi"></div>
+          <details class="assume" id="${id}-assume">
+            <summary><span>Assumptions <span class="muted">· jackpot, cash, plays</span></span></summary>
+            <div class="assume-grid">
+              <div><label for="${id}-annuity">Jackpot ($M)</label><input id="${id}-annuity" type="number" min="0" step="1" inputmode="decimal"></div>
+              <div><label for="${id}-cash">Cash value ($M)</label><input id="${id}-cash" type="number" min="0" step="0.1" inputmode="decimal"></div>
+              <div><label for="${id}-sold">Projected plays (M)</label><input id="${id}-sold" type="number" min="0" step="0.1" inputmode="decimal"></div>
+            </div>
+          </details>
+          <p class="note" id="${id}-note"></p>
+        </div>
+      </section>`);
+    prefill(id);
+  }
+
+  function prefill(id) {
+    const g = DATA && DATA.games && DATA.games[id];
+    if (!g) {
+      $(`${id}-note`).textContent = LOCAL ? 'No jackpot data: run node fetch-jackpots.js, or type the figures in.' : 'No jackpot data: type the figures in.';
+      $(`${id}-assume`).open = true;
+      return;
+    }
+    if (g.error) {
+      $(`${id}-note`).innerHTML = `<span class="error">Fetch failed: ${escapeHtml(g.error)}</span> Type the figures in.`;
+      $(`${id}-assume`).open = true;
+      return;
+    }
+    $(`${id}-annuity`).value = (g.next.annuity / 1e6).toFixed(1);
+    $(`${id}-cash`).value = (g.next.cash / 1e6).toFixed(1);
+    if (g.estimatedTicketsSold != null) $(`${id}-sold`).value = (g.estimatedTicketsSold / 1e6).toFixed(2);
+    const drift = g.prizeTableDrift && g.prizeTableDrift.length
+      ? ` <span class="error">The site's prize table no longer matches this one; the ROI may be wrong.</span>` : '';
+    // A failed refresh keeps the last good figures; say how old they are rather than passing them off as current.
+    const kept = g.lastError
+      ? ` <span class="error">The latest refresh failed (${escapeHtml(g.lastError)}); these figures are from ${escapeHtml(new Date(g.fetchedAt).toLocaleDateString())}.</span>` : '';
+    $(`${id}-note`).innerHTML =
+      `Last draw ${escapeHtml(formatDate(g.lastDrawDate))}: jackpot $${round(g.last.annuity / 1e6, 1)}M, cash $${round(g.last.cash / 1e6, 1)}M.` +
+      (g.estimatedTicketsSold == null ? ' Ticket sales could not be estimated (the jackpot may have just reset).' : '') + kept + drift;
+  }
+
+  // The age that matters is the oldest game's figures, not the run that wrote the file: a run whose fetch
+  // failed still writes it, keeping the old figures with their own date.
+  const figureDates = DATA && DATA.games
+    ? Object.values(DATA.games).filter((g) => g && !g.error && g.next).map((g) => new Date(g.fetchedAt || DATA.fetchedAt))
+    : [];
+  if (figureDates.length) {
+    const fetched = new Date(Math.min(...figureDates));
+    const ageDays = (Date.now() - fetched) / 864e5;
+    // Both games draw at least twice a week, so figures three days old have probably missed a draw.
+    $('dataNote').classList.toggle('stale', ageDays > 3);
+    $('dataNote').innerHTML = `<span>Jackpots as of ${escapeHtml(fetched.toLocaleString())}.` +
+      (ageDays > 3 ? ` <strong>Likely out of date.</strong>${LOCAL ? REFRESH_HINT : ' The daily refresh has not succeeded since then.'}</span>` : `${REFRESH_HINT}</span>`);
+  } else if (LOCAL) {
+    $('dataNote').classList.add('none');
+    $('dataNote').innerHTML = '<span>No jackpot data loaded. Run <code>node fetch-jackpots.js</code> beside this page, then reload.</span>';
+  } else {
+    $('dataNote').classList.add('none');
+    $('dataNote').innerHTML = '<span>No jackpot data loaded. Type the figures into each game\u2019s assumptions.</span>';
+  }
+
+  function render() {
+    const text = $('seed').value;
+    const count = Number($('count').value);
+    let firstResult = null;
+    for (const id of GAME_IDS) {
+      const box = $(`${id}-tickets`);
+      if (text === '') {
+        box.classList.remove('multi');
+        box.innerHTML = `<div class="empty-state">${ghostRow(id)}<p class="empty">Waiting for seed text.</p></div>`;
+      } else {
+        try {
+          const result = generate(text, GAMES[id], count);
+          firstResult = firstResult || result;
+          box.classList.toggle('multi', result.tickets.length > 1);
+          box.replaceChildren(...ticketRows(id, result.tickets, box));
+        } catch (e) {
+          box.classList.remove('multi');
+          box.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
+        }
+      }
+      renderJackpot(id);
+      renderRoi(id);
+    }
+    $('seedOut').replaceChildren(...(firstResult ? [seedView(firstResult.hashHex, text)] : []));
+    $('clearSeed').hidden = text === '';
+    const payoutName = document.querySelector('input[name=payout]:checked').value === 'cash' ? 'Cash' : 'Annuity';
+    $('settingsSummary').textContent = `${$('count').value || '?'} ${count === 1 ? 'ticket' : 'tickets'} · ${payoutName} · tax ${$('fedTax').value || 0}% + ${$('stateTax').value || 0}%`;
+    for (const chip of document.querySelectorAll('.chip[data-fill]')) chip.classList.toggle('is-active', text !== '' && chip.dataset.fill === text);
+    $('birthdayChip').classList.toggle('is-active', text !== '' && $('birthday').value === text);
+  }
+
+  function ghostRow(id) {
+    const ball = (finish) => `<span class="ball ghost ${finish}">?</span>`;
+    return `<div class="ticket" aria-hidden="true"><div class="balls"><div class="pool">${ball('').repeat(5)}</div><span class="plus">+</span>${ball('')}</div></div>`;
+  }
+
+  // A row whose numbers have not changed keeps its DOM node and does not replay the draw, so changing the
+  // ticket count only animates the tickets that are new.
+  function ticketRows(id, tickets, box) {
+    const previous = new Map([...box.querySelectorAll('.ticket[data-key]')].map((row) => [row.dataset.key, row]));
+    return tickets.map((ticket, t) => {
+      const key = `${t}:${ticket.map((pool) => pool.numbers.join(',')).join('|')}`;
+      const kept = previous.get(key);
+      if (kept) {
+        kept.classList.add('settled');
+        return kept;
+      }
+      const row = document.createElement('div');
+      row.className = 'ticket';
+      row.dataset.key = key;
+      const spoken = ticket.map((pool) => `${pool.label} ${pool.numbers.join(', ')}`).join('; ');
+      row.innerHTML = `<span class="n" aria-hidden="true">${t + 1}</span><span class="sr-only">Ticket ${t + 1}: ${escapeHtml(spoken)}.</span>`;
+      const balls = document.createElement('div');
+      balls.className = 'balls';
+      balls.setAttribute('aria-hidden', 'true');
+      ticket.forEach((pool, p) => {
+        if (p) balls.insertAdjacentHTML('beforeend', '<span class="plus">+</span>');
+        const group = document.createElement('div');
+        group.className = 'pool';
+        group.title = pool.label;
+        pool.numbers.forEach((x, i) => {
+          const ball = document.createElement('span');
+          ball.className = p ? `ball ${BONUS_FINISH[id]}` : 'ball';
+          ball.style.setProperty('--d', `${Math.min(t, 6) * 60 + (p * 5 + i) * 55}ms`);
+          const num = document.createElement('span');
+          num.className = 'num';
+          num.textContent = x;
+          ball.append(num);
+          group.append(ball);
+        });
+        balls.append(group);
+      });
+      row.append(balls);
+      return row;
+    });
+  }
+
+  // The headline jackpot, read back from the assumption fields so an edit shows up here too.
+  function renderJackpot(id) {
+    const annuity = $(`${id}-annuity`).value;
+    const cash = $(`${id}-cash`).value;
+    $(`${id}-jp`).textContent = annuity === '' ? 'Jackpot not set' : `${money(Number(annuity) * 1e6)} jackpot`;
+    const next = DATA && DATA.games && DATA.games[id] && !DATA.games[id].error ? DATA.games[id].nextDrawDate : null;
+    $(`${id}-jpsub`).textContent = [cash === '' ? '' : `${money(Number(cash) * 1e6)} cash`, next ? `draw ${formatDate(next)}` : '']
+      .filter(Boolean).join(' · ');
+  }
+
+  function renderRoi(id) {
+    const out = $(`${id}-roi`);
+    const payout = document.querySelector('input[name=payout]:checked').value;
+    const millions = (field) => ($(`${id}-${field}`).value === '' ? null : Number($(`${id}-${field}`).value) * 1e6);
+    const advertised = millions('annuity');
+    const cash = millions('cash');
+    const sold = millions('sold');
+    const jackpot = payout === 'cash' ? cash : advertised;
+    if (advertised == null || jackpot == null) {
+      out.innerHTML = `<p class="empty">Enter the jackpot${payout === 'cash' ? ' and its cash value' : ''} to price a ticket.</p>`;
+      return;
+    }
+    // An empty tax field counts as 0%, as its placeholder shows.
+    const taxRate = (Number($('fedTax').value || 0) + Number($('stateTax').value || 0)) / 100;
+    let results;
+    try {
+      results = PLAYS[id].map((play) => ({ play, r: expectedReturn({ play, jackpot, advertisedJackpot: advertised, ticketsSold: sold, taxRate }) }));
+    } catch (e) {
+      out.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
+      return;
+    }
+
+    // Break-even is computed in the form you take the money. Show it as the headline jackpot, which is the
+    // number people compare against, and as cash, converting at today's cash-to-jackpot ratio.
+    const cashRatio = cash != null && advertised > 0 ? cash / advertised : null;
+    const breakEven = (r) => {
+      const asJackpot = payout === 'cash' ? (cashRatio ? r.breakEvenJackpot / cashRatio : null) : r.breakEvenJackpot;
+      const asCash = payout === 'cash' ? r.breakEvenJackpot : (cashRatio ? r.breakEvenJackpot * cashRatio : null);
+      return { asJackpot, asCash };
+    };
+
+    const cols = results.length;
+    const row = (label, cells, cls = '') =>
+      `<div class="k ${cls}">${label}</div>${cells.map((c) => `<div class="v ${cls}">${c}</div>`).join('')}`;
+    const rule = '<div class="rule"></div>';
+    out.innerHTML = `
+      <div class="roi-tiles">${results.map(({ play, r }) => roiTile(play, r)).join('')}</div>
+      <div class="rows" style="grid-template-columns: 1fr${' auto'.repeat(cols)}; margin-top: var(--s-4)">
+        ${cols > 1 ? row('', results.map(({ play }) => `<span class="h">${PLAY_NAMES[play]}</span>`)) : ''}
+        ${row('Back per play, after tax', results.map(({ r }) => money(r.expected)))}
+        ${row('From fixed prizes', results.map(({ r }) => money(r.fixedPrizes)))}
+        ${row('Average multiplier on them', results.map(({ r }) => `${round(r.multiplier, 2)}x`), 'sub')}
+        ${row('From the jackpot', results.map(({ r }) => money(r.jackpotPart)))}
+        ${rule}
+        ${row('Break-even jackpot, at today’s sales', results.map(({ r }) => { const b = breakEven(r).asJackpot; return b == null ? '–' : money(b); }))}
+        ${row('as cash value', results.map(({ r }) => { const b = breakEven(r).asCash; return b == null ? '–' : money(b); }), 'sub')}
+      </div>
+      <p class="shared" style="margin-top: var(--s-3)">
+        If you win, you keep ${Math.round(results[0].r.jackpotShare * 100)}% of the jackpot on average${sold == null ? ' (sales unknown, so assuming no other winners)' : `, with ${round(sold / 1e6, 1)}M plays projected`}.
+        Any prize: 1 in ${round(results[0].r.anyPrizeOdds, 1)}.
+      </p>`;
+  }
+
+  // The headline for one play: the ROI as roi.js gives it, and the same figure read as cents back per dollar.
+  // The cents come from the rounded percentage, so "−68%" always sits beside "32¢" and never "33¢".
+  function roiTile(play, r) {
+    const pct = Math.round(Math.abs(r.roi) * 100);
+    const cls = roiClass(r.roi);
+    const back = cls === 'even' ? 100 : cls === 'loss' ? 100 - pct : 100 + pct;
+    const backText = back < 100 ? `${back}¢` : `$${(back / 100).toFixed(2)}`;
+    return `
+      <div class="roi-tile ${cls}">
+        <span class="roi-play">${PLAY_NAMES[play]}</span>
+        <span class="roi-big">${formatRoi(r.roi)}</span>
+        <div class="meter" aria-hidden="true"><span style="width:${Math.min(back, 100)}%"></span></div>
+        <p class="roi-back">You get back <strong>${backText}</strong> of every $1, on&nbsp;average</p>
+      </div>`;
+  }
+
+  /** "−68%", "+3%", or "0%" when it rounds to zero, rounding half away from zero on both sides. */
+  function formatRoi(roi) {
+    const pct = Math.round(Math.abs(roi) * 100);
+    if (pct === 0) return '0%';
+    return `${roi < 0 ? '−' : '+'}${pct}%`;
+  }
+
+  function roiClass(roi) {
+    const pct = Math.round(Math.abs(roi) * 100);
+    return pct === 0 ? 'even' : roi < 0 ? 'loss' : 'gain';
+  }
+
+  function seedView(hashHex, text) {
+    const card = document.createElement('section');
+    card.className = 'card seed';
+    card.setAttribute('aria-labelledby', 'seedTitle');
+    // Groups of eight are spaced by CSS margins, not characters, so selecting the hash copies it unbroken.
+    const groups = hashHex.match(/.{1,8}/g).map((g) => `<span>${g}</span>`).join('');
+    card.innerHTML = `
+      <h2 id="seedTitle">Check the draw</h2>
+      <div class="seed-main">
+        <span class="eyebrow" id="hashLabel" style="margin:0">SHA-256 seed</span>
+        <div class="hash" aria-labelledby="hashLabel">${groups}</div>
+        <p class="hint">Check it in a terminal: <code>printf '%s' '…your text…' | shasum -a 256</code></p>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn primary" data-copy="numbers">Copy numbers</button>
+        <button type="button" class="btn" data-copy="hash">Copy hash</button>
+      </div>`;
+    card.addEventListener('click', async (e) => {
+      const button = e.target.closest('[data-copy]');
+      if (!button) return;
+      const which = button.dataset.copy;
+      const numbers = () => GAME_IDS.map((id) => {
+        const { tickets } = generate(text, GAMES[id], Number($('count').value));
+        return `${GAMES[id].name}\n` + tickets.map((t) => t.map((p) => `${p.label}: ${p.numbers.join(' ')}`).join('  |  ')).join('\n');
+      }).join('\n\n');
+      try {
+        await navigator.clipboard.writeText(which === 'hash' ? hashHex : `"${text}"\n\n${numbers()}`);
+        flash(button, 'Copied');
+      } catch {
+        flash(button, 'Copy blocked');
+      }
+    });
+    return card;
+  }
+
+  function money(x) {
+    if (x >= 1e9) return `$${round(x / 1e9, 2)}B`;
+    if (x >= 1e6) return `$${round(x / 1e6, 1)}M`;
+    if (x >= 1000) return `$${Math.round(x).toLocaleString('en-US')}`;
+    return `$${x.toFixed(2)}`;
+  }
+
+  function round(x, places) {
+    return Number(x.toFixed(places)).toLocaleString('en-US', { maximumFractionDigits: places });
+  }
+
+  // Mega Millions gives "2026-10-06", Powerball "Wed, Oct 7, 2026"; show both the second way.
+  function formatDate(s) {
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    if (!iso) return s || 'unknown';
+    return new Date(+iso[1], iso[2] - 1, +iso[3]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function flash(button, label) {
+    if (button.dataset.label == null) button.dataset.label = button.textContent;
+    button.textContent = label;
+    clearTimeout(button._flash);
+    button._flash = setTimeout(() => (button.textContent = button.dataset.label), 1200);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+
+  // Grow the textarea with its content instead of scrolling inside it.
+  function autoGrow() {
+    $('seed').style.height = 'auto';
+    $('seed').style.height = $('seed').scrollHeight + 4 + 'px';
+  }
+
+  function setSeed(text) {
+    $('seed').value = text;
+    autoGrow();
+    render();
+  }
+
+  // Today's date in the local calendar, written the way people type a date seed.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  $('todayChip').dataset.fill = today;
+  $('todayText').textContent = today;
+  for (const chip of document.querySelectorAll('.chip[data-fill]')) chip.addEventListener('click', () => setSeed(chip.dataset.fill));
+  $('birthday').addEventListener('change', () => { if ($('birthday').value) setSeed($('birthday').value); });
+  $('clearSeed').addEventListener('click', () => { setSeed(''); $('seed').focus(); });
+
+  function stepCount(delta) {
+    const current = Number($('count').value) || 1;
+    $('count').value = Math.min(100, Math.max(1, Math.round(current) + delta));
+    render();
+  }
+  $('countDown').addEventListener('click', () => stepCount(-1));
+  $('countUp').addEventListener('click', () => stepCount(1));
+
+  // Open on anything wider than a phone; the summary line is hidden there, so it cannot be folded away by accident.
+  const phone = window.matchMedia('(max-width: 560px)');
+  $('settingsBox').open = !phone.matches;
+  phone.addEventListener('change', () => { if (!phone.matches) $('settingsBox').open = true; });
+
+  $('seed').addEventListener('input', autoGrow);
+  for (const el of document.querySelectorAll('#seed, .settings input, .assume input')) el.addEventListener('input', render);
+  render();
+</script>
+</body>
+</html>
