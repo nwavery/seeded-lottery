@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Seeded Lottery</title>
+<title>Nathan's Seeded Lottery</title>
 <style>
   /* One set of tokens for the whole page: colour, type, space, radius. Dark mode only swaps colours. */
   :root {
@@ -418,7 +418,7 @@
   <header class="masthead">
     <div class="brand">
       <span class="logo" aria-hidden="true"><span class="ball"></span><span class="ball red"></span><span class="ball gold"></span></span>
-      <h1>Seeded Lottery</h1>
+      <h1>Nathan's Seeded Lottery</h1>
     </div>
     <p class="tagline">Type anything. <strong>The same text always draws the same numbers.</strong></p>
   </header>
@@ -534,7 +534,7 @@
           </div>
         </header>
         <div class="tickets" id="${id}-tickets"></div>
-        <div class="legend">${g.pools.map((p, i) => `<span><span class="ball${i ? ` ${BONUS_FINISH[id]}` : ''}" aria-hidden="true"></span>${escapeHtml(p.label)}: ${p.count} of 1–${p.max}</span>`).join('')}
+        <div class="legend">${g.pools.map((p, i) => `<span><span class="ball${i ? ` ${BONUS_FINISH[id]}` : ''}" aria-hidden="true"></span>${escapeHtml(p.label)}: ${p.count} of 1 to ${p.max}</span>`).join('')}
           <span>Jackpot: 1 in ${jackpotOdds(g).toLocaleString('en-US')}</span></div>
         <div class="roi">
           <span class="eyebrow" style="margin:0">ROI per ticket, after tax</span>
@@ -729,8 +729,8 @@
         ${row('Average multiplier on them', results.map(({ r }) => `${round(r.multiplier, 2)}x`), 'sub')}
         ${row('From the jackpot', results.map(({ r }) => money(r.jackpotPart)))}
         ${rule}
-        ${row('Break-even jackpot, at today’s sales', results.map(({ r }) => { const b = breakEven(r).asJackpot; return b == null ? '–' : money(b); }))}
-        ${row('as cash value', results.map(({ r }) => { const b = breakEven(r).asCash; return b == null ? '–' : money(b); }), 'sub')}
+        ${row('Break-even jackpot, at today’s sales', results.map(({ r }) => { const b = breakEven(r).asJackpot; return b == null ? 'n/a' : money(b); }))}
+        ${row('as cash value', results.map(({ r }) => { const b = breakEven(r).asCash; return b == null ? 'n/a' : money(b); }), 'sub')}
       </div>
       <p class="shared" style="margin-top: var(--s-3)">
         If you win, you keep ${Math.round(results[0].r.jackpotShare * 100)}% of the jackpot on average${sold == null ? ' (sales unknown, so assuming no other winners)' : `, with ${round(sold / 1e6, 1)}M plays projected`}.

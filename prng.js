@@ -153,7 +153,7 @@
     for (const p of game.pools) {
       if (!Number.isInteger(p.count) || !Number.isInteger(p.max)) throw new Error(`${p.label}: counts and ranges must be whole numbers.`);
       if (p.max < 1 || p.max > 10000) throw new Error(`${p.label}: the range must be 1 to 10,000.`);
-      if (p.count < 1 || p.count > p.max) throw new Error(`${p.label}: can't pick ${p.count} distinct numbers from 1–${p.max}.`);
+      if (p.count < 1 || p.count > p.max) throw new Error(`${p.label}: can't pick ${p.count} distinct numbers from 1 to ${p.max}.`);
     }
     return game;
   }

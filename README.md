@@ -1,4 +1,4 @@
-# Seeded Lottery
+# Nathan's Seeded Lottery
 
 Type any text and get Powerball and Mega Millions numbers, side by side, with the expected return on a
 ticket at the current jackpots. The same text always gives the same numbers.
