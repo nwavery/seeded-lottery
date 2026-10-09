@@ -11,7 +11,11 @@ Open `index.html` in a browser (double-click works, no server needed). To refres
     node fetch-jackpots.js
 
 That writes `jackpots.js`, which the page loads. If a site can't be read, the page says so and you can type
-the figures in.
+the figures in. `node fetch-jackpots.js some/other/path.js` writes somewhere else instead.
+
+Don't commit a `jackpots.js` you fetched yourself. The daily run writes the published one, and a pushed
+copy replaces its figures on the site with yours, however old. If both changed it, the next daily run fails
+at its rebase. `git checkout -- jackpots.js` before committing.
 
 ## The numbers (`prng.js`)
 
@@ -39,18 +43,27 @@ Expected winnings per ticket, after tax, over the ticket price:
   Bigger jackpots sell more tickets, so the real break-even is higher.
 
 Neither game has a public API. Mega Millions' site calls a JSON endpoint of its own; Powerball's figures are
-read from its page HTML. Both can change without notice; `fetch-jackpots.js` fails loudly rather than guess,
-and checks Mega Millions' published prize table against `roi.js`.
+read from its page HTML. Both can change without notice, so `fetch-jackpots.js` fails loudly rather than
+guess. It refuses figures no lottery would advertise (cash above the annuity, cash outside 0.2 to 0.9 of it,
+a jackpot outside $20M to $5B, or a cash value that fell without a win) and figures for a draw that has
+already happened. It also checks Mega Millions' published prize table and ball ranges against `roi.js` and
+`prng.js`. Each request is tried three times, 2 and 5 seconds apart.
 
 ## Hosting
 
 The page is published to GitHub Pages by `.github/workflows/pages.yml`, which runs on every push to `main`,
-once a day at 10:00 UTC, and on demand from the Actions tab. The daily run fetches the jackpots and commits
-`jackpots.js` if it changed, so visitors only ever load a file and never touch the lottery sites. Only
-`index.html`, `prng.js`, `roi.js` and `jackpots.js` are published.
+once a day at 10:23 UTC, and on demand from the Actions tab. The daily run fetches the jackpots, checks the
+new `jackpots.js` loads with everything the page reads, commits it if it changed, and runs the tests again
+on the tree it is about to publish. Visitors only ever load a file and never touch the lottery sites. Only
+`index.html`, `prng.js`, `roi.js` and `jackpots.js` are published. Pull requests run the tests and nothing
+else.
 
 If a fetch fails, `jackpots.js` keeps that game's last good figures with the date they were fetched, the page
-shows how old they are, and the run is marked failed so it shows up in the Actions tab.
+shows how old they are, and the run is marked failed so it shows up in the Actions tab. To fetch again, use
+Run workflow; re-running the failed job replays the same result. A changed Mega Millions prize table also
+marks the run failed, while still publishing, since the ROI shown is wrong until `roi.js` is updated.
+
+The workflow's actions are pinned to commit SHAs, and Dependabot proposes updates weekly.
 
 ## Tests
 

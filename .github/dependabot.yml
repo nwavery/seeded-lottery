@@ -1,0 +1,15 @@
+# The workflow's actions are the project's only dependencies: no package.json, and the page loads only its
+# own files. They are pinned to commit SHAs, so this is what moves them forward.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # GitHub's Pages documentation pairs these three by version, so they move together in one pull request.
+      pages:
+        patterns:
+          - actions/configure-pages
+          - actions/upload-pages-artifact
+          - actions/deploy-pages

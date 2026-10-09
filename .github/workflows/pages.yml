@@ -1,13 +1,17 @@
-# Publishes the page to GitHub Pages, and refreshes the jackpots once a day.
+# Publishes the page to GitHub Pages, and refreshes the jackpots once a day. Pull requests only run the tests.
 #
 # Visitors never fetch anything from the lottery sites: they load jackpots.js, which this workflow rewrites.
 # Both games post their new estimates overnight (Powerball draws Mon/Wed/Sat 10:59 PM ET, Mega Millions
 # Tue/Fri 11 PM ET), so one run a day after that catches every draw.
+#
+# Actions are pinned to commit SHAs, with the release as a comment; Dependabot (.github/dependabot.yml)
+# proposes updates, and its pull requests run the tests here.
 name: Pages
 
 on:
   push:
     branches: [main]
+  pull_request:
   schedule:
     # 10:23 UTC is 6:23 AM EDT / 5:23 AM EST. Off the hour, because the top of the hour is when GitHub
     # delays or drops scheduled runs; a late start is fine here.
@@ -16,17 +20,36 @@ on:
 
 permissions: {}
 
-# One run at a time, so a scheduled refresh and a push can't race each other's commit or deploy. queue: max
-# keeps every waiting run; the default keeps only the newest, so a push could cancel the day's refresh.
+# One run at a time on main, so a scheduled refresh and a push can't race each other's commit or deploy.
+# queue: max keeps every waiting run; the default keeps only the newest, so a push could cancel the day's
+# refresh. Pull requests queue apart, one group each, so they never wait behind a deploy.
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('test-{0}', github.ref) || 'pages' }}
   cancel-in-progress: false
   queue: max
 
 jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+
+      - name: Test
+        run: node --test
+
   build:
     # Only main is published. A manual run from another branch would otherwise commit on that branch and
-    # rebase it, whole, onto main.
+    # rebase it, whole, onto main. A pull request's ref is refs/pull/..., so it never gets here.
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: write   # to commit the refreshed jackpots.js
@@ -35,10 +58,19 @@ jobs:
     timeout-minutes: 10
     outputs:
       fetch_failed: ${{ steps.fetch.outputs.failed }}
+      drift: ${{ steps.fetch.outputs.drift }}
     steps:
-      - uses: actions/checkout@v6
+      # The tip of main, not the commit that started the run. A re-run or a run that waited in the queue
+      # then reads the latest jackpots.js as its previous one, so its rebase is clean, and a push run queued
+      # behind a refresh never puts an older jackpots.js back on the site.
+      # No credentials stay in .git/config: the Test and Fetch steps run repo code and parse what the
+      # lottery sites send. Only the commit step gets the token.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: main
+          persist-credentials: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
 
@@ -47,19 +79,34 @@ jobs:
 
       # Push runs publish what was pushed; only scheduled and manual runs go to the lottery sites.
       # A failed fetch still writes jackpots.js, keeping each game's last good figures, so carry on and
-      # publish, then fail the run at the end so it shows red.
+      # publish, then fail the run at the end so it shows red. Same for a changed prize table.
       - name: Fetch jackpots
         id: fetch
         if: github.event_name != 'push'
         run: |
-          if node fetch-jackpots.js; then
-            echo "failed=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "failed=1" >> "$GITHUB_OUTPUT"
-          fi
+          # The exit status is a bit set: 1 a fetch failed, 2 Mega Millions' prize table or ball ranges
+          # changed. Any other status is a crash, counted as a failed fetch.
+          code=0
+          node fetch-jackpots.js || code=$?
+          case "$code" in
+            0) failed=0; drift=0 ;;
+            2) failed=0; drift=1 ;;
+            3) failed=1; drift=1 ;;
+            *) failed=1; drift=0 ;;
+          esac
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+
+      # The new jackpots.js, loaded the way the page loads it and checked for what the page reads. A file
+      # the page could not show stops the run here, before it is committed or published.
+      - name: Check jackpots.js
+        if: github.event_name != 'push'
+        run: node --test test/jackpots.test.js
 
       - name: Commit jackpots
         if: github.event_name != 'push'
+        env:
+          TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- jackpots.js; then
             echo "jackpots.js unchanged"
@@ -69,9 +116,27 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add jackpots.js
           git commit -m "Refresh jackpots"
-          # Someone may have pushed since checkout; jackpots.js is only ever written here, so a rebase is clean.
-          git pull --rebase origin main
-          git push origin HEAD:main
+          # The token goes on each command that talks to GitHub, never into .git/config.
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          with_token() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" "$@"; }
+          # Someone may have pushed since checkout. The rebase is clean unless that push also changed
+          # jackpots.js, which a hand-committed copy does (the README warns against it); that conflict fails
+          # here rather than guess. A push landing between our pull and push is rejected: pull and push once more.
+          for _ in 1 2; do
+            with_token pull --rebase origin main
+            if with_token push origin HEAD:main; then
+              exit 0
+            fi
+          done
+          echo "::error::The refreshed jackpots.js could not be pushed after two tries."
+          exit 1
+
+      # The rebase may have brought in commits pushed while this run waited, which no test here has seen.
+      # Test the tree that is about to be published.
+      - name: Test again
+        if: github.event_name != 'push'
+        run: node --test
 
       # Only the files the page loads. Tests, fixtures and the fetch script stay out of the site.
       - name: Assemble site
@@ -80,9 +145,9 @@ jobs:
           cp index.html prng.js roi.js jackpots.js _site/
 
       # The versions GitHub's Pages documentation pairs together.
-      - uses: actions/configure-pages@v6
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: _site
 
@@ -98,10 +163,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
+      # Both reports read the build job's stored outputs, so re-running only this failed job replays them
+      # without fetching. Run workflow fetches again.
       - name: Report a failed fetch
         if: needs.build.outputs.fetch_failed == '1'
         run: |
-          echo "::error::A jackpot fetch failed; the site kept the last good figures. See the build job's Fetch jackpots step."
+          echo "::error::A jackpot fetch failed; the site kept the last good figures. See the build job's Fetch jackpots step. To fetch again, use Run workflow: re-running failed jobs replays this result."
+          exit 1
+
+      # Runs even when the step above failed, so both problems are reported.
+      - name: Report a changed prize table
+        if: ${{ !cancelled() && needs.build.outputs.drift == '1' }}
+        run: |
+          echo "::error::Mega Millions' prize table or ball ranges no longer match roi.js and prng.js, so its ROI is wrong. The build job's Fetch jackpots step lists the differences."
           exit 1
