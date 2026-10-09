@@ -128,8 +128,8 @@ test('expected jackpot share is E[1/(1+K)] for Poisson K', () => {
     }
     close(expectedJackpotShare(λ), sum, 1e-9, `λ = ${λ}`);
   }
-  assert.throws(() => expectedJackpotShare(-1));
-  assert.throws(() => expectedJackpotShare(NaN));
+  assert.throws(() => expectedJackpotShare(-1), /must be >= 0, got -1/);
+  assert.throws(() => expectedJackpotShare(NaN), /must be >= 0, got NaN/);
 });
 
 test('more tickets sold means a smaller expected share', () => {
@@ -169,6 +169,31 @@ test('the break-even jackpot breaks even', () => {
       close(expectedReturn({ ...base, jackpot: breakEvenJackpot }).roi, 0, 0, `${play} ${sold} ${tax}`, 1e-12);
     }
   }
+});
+
+test('the break-even jackpot breaks even at the multiplier that applies there', () => {
+  // Today's jackpot can be $150M or less, where Power Play's 10x is in play, but the break-even figure is
+  // always above $150M, where it is not. Recompute ROI with the break-even figure as the advertised jackpot,
+  // as a reader of the page would if the jackpot reached it: annuity payout, and cash at a 0.45 cash ratio.
+  for (const play of Object.keys(PAYOUTS)) {
+    for (const today of [20e6, 100e6, 150e6, 151e6, 5e8]) {
+      for (const [sold, tax] of [[null, 0], [1.2e7, 0.37]]) {
+        const base = { play, ticketsSold: sold, taxRate: tax };
+        const annuity = expectedReturn({ ...base, jackpot: today, advertisedJackpot: today }).breakEvenJackpot;
+        close(expectedReturn({ ...base, jackpot: annuity, advertisedJackpot: annuity }).roi, 0, 0, `${play} annuity, today ${today}, ${sold} ${tax}`, 1e-12);
+        const cash = expectedReturn({ ...base, jackpot: today * 0.45, advertisedJackpot: today }).breakEvenJackpot;
+        close(expectedReturn({ ...base, jackpot: cash, advertisedJackpot: cash / 0.45 }).roi, 0, 0, `${play} cash, today ${today}, ${sold} ${tax}`, 1e-12);
+      }
+    }
+  }
+});
+
+test('the break-even jackpot is always above the $150M where Power Play drops 10x', () => {
+  // The break-even prices the fixed prizes without 10x, which holds only while this does. The lowest case
+  // is no tax and nobody to share with; anything else raises it. $637M would mean 10x was priced in.
+  const { breakEvenJackpot } = expectedReturn({ play: 'powerballPowerPlay', jackpot: 0, advertisedJackpot: 20e6, ticketsSold: null, taxRate: 0 });
+  assert.ok(breakEvenJackpot > 150e6, `${breakEvenJackpot}`);
+  close(breakEvenJackpot, 648.9e6, 0.001, 'the minimum break-even');
 });
 
 test('nonsense inputs are refused', () => {
