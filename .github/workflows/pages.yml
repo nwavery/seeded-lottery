@@ -108,7 +108,8 @@ jobs:
         env:
           TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- jackpots.js; then
+          # git status, not git diff: it also sees a jackpots.js the checkout did not have.
+          if [ -z "$(git status --porcelain -- jackpots.js)" ]; then
             echo "jackpots.js unchanged"
             exit 0
           fi
@@ -120,16 +121,27 @@ jobs:
           auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
           echo "::add-mask::$auth"
           with_token() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" "$@"; }
-          # Someone may have pushed since checkout. The rebase is clean unless that push also changed
-          # jackpots.js, which a hand-committed copy does (the README warns against it); that conflict fails
-          # here rather than guess. A push landing between our pull and push is rejected: pull and push once more.
-          for _ in 1 2; do
-            with_token pull --rebase origin main
+          rebasing() { [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; }
+          # Someone may have pushed since checkout. Three tries: a pull can fail on the network, and a push is
+          # rejected when someone pushes between our pull and our push. A rebase conflict is not retried. It
+          # means that push changed jackpots.js too, almost always a copy committed by hand (the README warns
+          # against it), and it needs a person.
+          for _ in 1 2 3; do
+            if ! with_token pull --rebase origin main; then
+              if rebasing; then
+                echo "::error::jackpots.js conflicts with a change on main, most likely a jackpots.js committed by hand. Nothing from this run was pushed or published. Drop that change to jackpots.js on main, then use Run workflow."
+                exit 1
+              fi
+              echo "Pull failed; trying again in 5 seconds."
+              sleep 5
+              continue
+            fi
             if with_token push origin HEAD:main; then
               exit 0
             fi
+            echo "Push rejected; pulling again."
           done
-          echo "::error::The refreshed jackpots.js could not be pushed after two tries."
+          echo "::error::The refreshed jackpots.js could not be pushed after three tries."
           exit 1
 
       # The rebase may have brought in commits pushed while this run waited, which no test here has seen.
