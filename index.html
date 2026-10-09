@@ -91,8 +91,8 @@
   .error { color: var(--loss); font-weight: 600; }
 
   /* ---------- Masthead ---------- */
-  .masthead { display: flex; flex-direction: column; gap: var(--s-2); margin-bottom: var(--s-5); }
-  .brand { display: flex; align-items: center; gap: var(--s-3); }
+  .masthead { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-2); margin-bottom: var(--s-5); }
+  .brand { display: flex; align-items: center; justify-content: center; gap: var(--s-3); }
   .logo { display: flex; flex: none; }
   .logo .ball { --size: 30px; animation: none; }
   .logo .ball + .ball { margin-left: -9px; }
@@ -102,11 +102,11 @@
 
   /* ---------- Seed hero ---------- */
   .hero { padding: var(--s-5); }
-  .hero-label { font: 800 var(--t-lg)/1.2 var(--font-round); color: var(--ink); display: block; margin-bottom: var(--s-3); }
+  .hero-label { font: 800 var(--t-lg)/1.2 var(--font-round); color: var(--ink); display: block; margin-bottom: var(--s-3); text-align: center; }
   .seed-box { position: relative; }
   textarea#seed {
     display: block; width: 100%; resize: none; overflow: hidden;
-    min-height: 64px; padding: 14px 56px 14px var(--s-4);
+    min-height: 64px; padding: 14px 56px; text-align: center;
     font: 600 24px/1.3 var(--font-round); color: var(--ink); letter-spacing: -0.01em;
     background: var(--sunken); border: 2px solid var(--line-strong); border-radius: var(--r-md);
     transition: border-color .15s, background-color .15s;
@@ -120,9 +120,9 @@
   }
   .clear:hover { background: var(--line); color: var(--ink); }
   .clear[hidden] { display: none; }
-  .hero .hint { margin-top: var(--s-2); }
+  .hero .hint { margin-top: var(--s-3); text-align: center; }
 
-  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: var(--s-3); }
+  .chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-3); }
   .chips-label { font-size: var(--t-sm); color: var(--muted); margin-right: var(--s-1); }
   .chip {
     display: inline-flex; align-items: center; gap: var(--s-2); min-height: 40px; max-width: 100%;
@@ -136,12 +136,20 @@
   .chip .chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 20ch; }
   .chip .chip-key { color: var(--muted); }
   .chip.is-active .chip-key { color: inherit; opacity: .75; }
-  .chip-date { padding-right: var(--s-1); cursor: default; }
-  .chip-date input {
-    font: 500 var(--t-sm)/1 var(--font); color: var(--ink); background: var(--sunken);
-    border: 1px solid var(--line); border-radius: var(--r-pill); padding: 6px 10px; min-height: 32px;
+  .chip[aria-expanded=true]:not(.is-active) { border-color: var(--ink); background: var(--sunken); }
+  .bday {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: end; gap: var(--s-2);
+    margin-top: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunken);
   }
-  .chip-date.is-active input { background: var(--card); }
+  .bday[hidden] { display: none; }
+  .bday label { display: flex; flex-direction: column; gap: 4px; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
+  .bday select {
+    min-height: var(--tap); padding: 0 var(--s-3); font: 600 var(--t-md)/1 var(--font); color: var(--ink);
+    background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r-md); cursor: pointer;
+  }
+  .bday select:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .bday .bday-done { min-height: var(--tap); padding: 0 var(--s-4); border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); font: 600 var(--t-sm)/1 var(--font); cursor: pointer; }
+  .bday .bday-done:hover { border-color: var(--ink); }
 
   /* Settings */
   /* Settings sit open on wide screens. On a phone they fold into one summary line under the seed. */
@@ -150,7 +158,7 @@
   .settings {
     display: grid; gap: var(--s-4) var(--s-5); align-items: end;
     grid-template-columns: max-content minmax(190px, 240px) minmax(110px, 150px) minmax(110px, 150px);
-    padding-top: var(--s-5);
+    justify-content: center; padding-top: var(--s-5);
   }
   .field > label, .field > .label { display: block; font-size: var(--t-sm); font-weight: 600; color: var(--muted); margin-bottom: 6px; }
   input[type=number] {
@@ -185,7 +193,7 @@
   .toggle input:focus-visible + label { outline: 3px solid var(--focus); outline-offset: 0; }
 
   .status {
-    display: flex; gap: var(--s-2); align-items: baseline; margin: var(--s-4) var(--s-1) 0;
+    display: flex; gap: var(--s-2); align-items: baseline; justify-content: center; text-align: center; margin: var(--s-4) var(--s-1) 0;
     font-size: var(--t-sm); color: var(--muted);
   }
   .status::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gain); transform: translateY(-1px); }
@@ -210,8 +218,8 @@
   /* A narrow column puts the jackpot on its own line under the name rather than wrapping it ragged. */
   .game { container: game / inline-size; }
   @container game (max-width: 460px) {
-    .game-head { flex-direction: column; gap: var(--s-2); }
-    .jackpot { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s-2); text-align: left; }
+    .game-head { flex-direction: column; align-items: center; gap: var(--s-2); }
+    .jackpot { flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 var(--s-2); text-align: center; }
     .jackpot-amt { font-size: var(--t-md); }
   }
 
@@ -219,7 +227,7 @@
      ball always share one line, from a 375px phone up to a wide desktop column. */
   .tickets { display: flex; flex-direction: column; gap: var(--s-2); container-type: inline-size; }
   .ticket {
-    display: flex; align-items: center; gap: var(--s-2);
+    display: flex; align-items: center; justify-content: center; gap: var(--s-2);
     padding: 10px var(--s-3); border-radius: var(--r-md);
     background: var(--sunken); border: 1px solid var(--line);
   }
@@ -281,21 +289,22 @@
     .ball, .ball .num { animation: none !important; }
     * { transition: none !important; }
   }
-  .empty-state { display: flex; flex-direction: column; gap: var(--s-2); }
+  .empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-2); }
   .empty { color: var(--muted); font-size: var(--t-sm); }
 
-  .legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); font-size: var(--t-xs); color: var(--muted); margin-top: calc(-1 * var(--s-1)); }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-1) var(--s-4); font-size: var(--t-xs); color: var(--muted); margin-top: calc(-1 * var(--s-1)); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend .ball { --size: 12px; animation: none; box-shadow: inset -1px -1px 2px rgba(0, 0, 0, .25), 0 0 0 1px rgba(0, 0, 0, .08); }
   .legend .ball::after { display: none; }
 
   /* ROI */
   .roi { display: flex; flex-direction: column; gap: var(--s-4); padding-top: var(--s-4); border-top: 1px dashed var(--line-strong); }
+  .roi > .eyebrow { text-align: center; }
   .roi-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s-3); }
   /* Subgrid lines the tiles' rows up, so a play name that wraps does not knock its figures out of line. */
   .roi-tile {
     background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-3) var(--s-4) var(--s-4);
-    display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 6px; align-content: start;
+    display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 6px; align-content: start; text-align: center;
   }
   .roi-play { font-size: var(--t-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
   .roi-big { font: 800 40px/1 var(--font-round); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
@@ -374,7 +383,7 @@
     main { padding-top: var(--s-5); }
     .card { padding: var(--s-4); border-radius: var(--r-md); }
     .tagline { font-size: var(--t-md); }
-    textarea#seed { font-size: 20px; min-height: 56px; padding: 12px 52px 12px 14px; }
+    textarea#seed { font-size: 20px; min-height: 56px; padding: 12px 48px; }
     .clear { top: 6px; right: 6px; }
     .settings { gap: var(--s-3); padding-top: var(--s-2); }
     .settings-box { margin-top: var(--s-3); }
@@ -390,11 +399,7 @@
     .settings-box[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
     .settings-summary { color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .settings-box[open] .settings-summary { visibility: hidden; }
-    .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--s-4)); padding: 2px var(--s-4); scroll-padding-inline: var(--s-4); }
-    .chips::-webkit-scrollbar { display: none; }
-    .chips { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
-    .chip { flex: none; }
-    textarea#seed:placeholder-shown { padding-right: 14px; }
+    .chips-label { flex-basis: 100%; text-align: center; margin: 0; }
     .game h2 { font-size: var(--t-lg); }
     .ticket { padding: 8px 10px; }
     .roi-big { font-size: 32px; }
@@ -427,11 +432,17 @@
     <div class="chips" role="group" aria-label="Fill in an example">
       <span class="chips-label">Try</span>
       <button type="button" class="chip" id="todayChip" data-fill=""><span class="chip-key">Today</span><span class="chip-text" id="todayText"></span></button>
-      <label class="chip chip-date" id="birthdayChip"><span class="chip-key">Birthday</span><input type="date" id="birthday"></label>
+      <button type="button" class="chip" id="birthdayChip" aria-expanded="false" aria-controls="bdayPanel"><span class="chip-key">Birthday</span><span class="chip-text" id="birthdayText"></span></button>
       <button type="button" class="chip" data-fill="Hello, world"><span class="chip-text">“Hello, world”</span></button>
       <button type="button" class="chip" data-fill="The quick brown fox jumps over the lazy dog"><span class="chip-text">“The quick brown fox jumps over the lazy dog”</span></button>
     </div>
-    <p class="hint">Exact text: spaces and capitals count. "Hello" and "hello " draw differently.</p>
+    <div class="bday" id="bdayPanel" role="group" aria-label="Pick a birthday" hidden>
+      <label>Month<select id="bdayMonth"></select></label>
+      <label>Day<select id="bdayDay"></select></label>
+      <label>Year<select id="bdayYear"></select></label>
+      <button type="button" class="bday-done" id="bdayDone">Done</button>
+    </div>
+    <p class="hint">Exact text: spaces and capitals count, and so does how you write a date. The chips write dates like 10/9/2026.</p>
 
     <details class="settings-box" id="settingsBox">
     <summary><span>Settings</span><span class="settings-summary" id="settingsSummary"></span></summary>
@@ -615,7 +626,7 @@
     const payoutName = document.querySelector('input[name=payout]:checked').value === 'cash' ? 'Cash' : 'Annuity';
     $('settingsSummary').textContent = `${$('count').value || '?'} ${count === 1 ? 'ticket' : 'tickets'} · ${payoutName} · tax ${$('fedTax').value || 0}% + ${$('stateTax').value || 0}%`;
     for (const chip of document.querySelectorAll('.chip[data-fill]')) chip.classList.toggle('is-active', text !== '' && chip.dataset.fill === text);
-    $('birthdayChip').classList.toggle('is-active', text !== '' && $('birthday').value === text);
+    $('birthdayChip').classList.toggle('is-active', text !== '' && birthdaySeed() === text);
   }
 
   function ghostRow(id) {
@@ -831,13 +842,57 @@
     render();
   }
 
-  // Today's date in the local calendar, written the way people type a date seed.
+  // Dates are written the US way, month/day/year with no leading zeros (10/9/2026), as people here type
+  // them. The seed is the exact text, so the chips must always write a date the same way.
+  const usDate = (y, m, d) => `${m}/${d}/${y}`;
   const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const today = usDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
   $('todayChip').dataset.fill = today;
   $('todayText').textContent = today;
-  for (const chip of document.querySelectorAll('.chip[data-fill]')) chip.addEventListener('click', () => setSeed(chip.dataset.fill));
-  $('birthday').addEventListener('change', () => { if ($('birthday').value) setSeed($('birthday').value); });
+  for (const chip of document.querySelectorAll('.chip[data-fill]')) {
+    chip.addEventListener('click', () => { closeBirthday(); setSeed(chip.dataset.fill); });
+  }
+
+  // Birthday: month, day and year menus. Picking a full date fills the seed straight away, and clicking the
+  // chip again fills it again, so a birthday can be re-picked after choosing something else.
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const fillSelect = (sel, placeholder, options) => {
+    const keep = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>` + options.map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+  };
+  fillSelect($('bdayMonth'), 'Month', MONTHS.map((name, i) => [i + 1, name]));
+  fillSelect($('bdayYear'), 'Year', Array.from({ length: now.getFullYear() - 1899 }, (_, i) => now.getFullYear() - i).map((y) => [y, y]));
+  function fillDays() {
+    // Day 0 of the next month is the last day of this one; with no month or year yet, allow 31 (or 29 for February).
+    const m = Number($('bdayMonth').value), y = Number($('bdayYear').value);
+    const last = m ? new Date(y || 2000, m, 0).getDate() : 31;
+    fillSelect($('bdayDay'), 'Day', Array.from({ length: last }, (_, i) => [i + 1, i + 1]));
+  }
+  fillDays();
+  function birthdaySeed() {
+    const m = $('bdayMonth').value, d = $('bdayDay').value, y = $('bdayYear').value;
+    return m && d && y ? usDate(y, m, d) : null;
+  }
+  function openBirthday(open) {
+    $('bdayPanel').hidden = !open;
+    $('birthdayChip').setAttribute('aria-expanded', String(open));
+  }
+  function closeBirthday() { openBirthday(false); }
+  function applyBirthday() {
+    const seed = birthdaySeed();
+    $('birthdayText').textContent = seed || '';
+    if (seed) setSeed(seed);
+  }
+  $('birthdayChip').addEventListener('click', () => {
+    const opening = $('bdayPanel').hidden;
+    openBirthday(opening);
+    if (birthdaySeed()) applyBirthday();
+    if (opening) $('bdayMonth').focus();
+  });
+  for (const id of ['bdayMonth', 'bdayYear']) $(id).addEventListener('change', () => { fillDays(); applyBirthday(); });
+  $('bdayDay').addEventListener('change', applyBirthday);
+  $('bdayDone').addEventListener('click', () => { closeBirthday(); $('birthdayChip').focus(); });
   $('clearSeed').addEventListener('click', () => { setSeed(''); $('seed').focus(); });
 
   function stepCount(delta) {
