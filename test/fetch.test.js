@@ -66,7 +66,16 @@ test('powerball.com draw result: the draw just held', () => {
     annuity: 485e6,
     cash: 199.7e6,
   });
-  assert.throws(() => parsePowerballLastDraw(fixture('powerball-home.html').replace(/cash-value/g, 'x')));
+});
+
+test('powerball.com draw result with either figure block missing fails, naming the block', () => {
+  // Each block removed alone from the draw-result page, so the other one is still there to be misread.
+  const html = fixture('powerball-latest-draw.html');
+  for (const cls of ['cash-value', 'estimated-jackpot']) {
+    const planted = html.replace(new RegExp(cls, 'g'), 'x');
+    assert.notEqual(planted, html);
+    assert.throws(() => parsePowerballLastDraw(planted), new RegExp(`no "${cls}" block`), cls);
+  }
 });
 
 test('megamillions.com endpoint: last and next draw', () => {

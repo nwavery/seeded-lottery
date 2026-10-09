@@ -189,7 +189,21 @@
     return { hashHex: toHex(hash), tickets: out };
   }
 
-  const api = { GAMES, jackpotOdds, sha256, sha256Bytes, toHex, Xoshiro256, validateGame, drawTicket, generate };
+  /**
+   * A date as the page's chips write it into the seed: month/day/year with no leading zeros, "10/9/2026".
+   * Part of the same contract as the draw: the seed is the exact text, so writing the same date another way
+   * re-seeds every date ticket. Takes numbers or the digit strings a <select> holds; "09" and 9 both give 9.
+   * Throws on anything that is not a calendar month and day, rather than seeding with it.
+   */
+  function usDate(year, month, day) {
+    const [y, m, d] = [year, month, day].map((v) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v));
+    if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d) || m < 1 || m > 12 || d < 1 || d > 31) {
+      throw new Error(`not a date: ${JSON.stringify([year, month, day])}`);
+    }
+    return `${m}/${d}/${y}`;
+  }
+
+  const api = { GAMES, jackpotOdds, sha256, sha256Bytes, toHex, Xoshiro256, validateGame, drawTicket, generate, usDate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SeededLottery = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
