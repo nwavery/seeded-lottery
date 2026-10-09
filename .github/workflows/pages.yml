@@ -126,14 +126,23 @@ jobs:
           # rejected when someone pushes between our pull and our push. A rebase conflict is not retried. It
           # means that push changed jackpots.js too, almost always a copy committed by hand (the README warns
           # against it), and it needs a person.
-          for _ in 1 2 3; do
+          for try in 1 2 3; do
             if ! with_token pull --rebase origin main; then
               if rebasing; then
                 echo "::error::jackpots.js conflicts with a change on main, most likely a jackpots.js committed by hand. Nothing from this run was pushed or published. Drop that change to jackpots.js on main, then use Run workflow."
                 exit 1
               fi
-              echo "Pull failed; trying again in 5 seconds."
-              sleep 5
+              # Refused before reaching the network: something besides jackpots.js changed in the checkout,
+              # which no retry fixes.
+              dirty=$(git status --porcelain --untracked-files=no)
+              if [ -n "$dirty" ]; then
+                echo "::error::The pull was refused because the checkout has uncommitted changes besides jackpots.js: $(echo "$dirty" | tr '\n' ' ')"
+                exit 1
+              fi
+              if [ "$try" -lt 3 ]; then
+                echo "Pull failed; trying again in 5 seconds."
+                sleep 5
+              fi
               continue
             fi
             if with_token push origin HEAD:main; then
