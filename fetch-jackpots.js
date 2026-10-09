@@ -277,7 +277,9 @@ function checkFigures(gameId, record) {
   }
   // A rolled jackpot always grows, so the same pair twice means the next figures were never updated: the
   // page moved its dates on and left the jackpot block showing the draw just held. Either figure alone may
-  // repeat, since each is rounded.
+  // repeat, since each is rounded. Blind spot: Powerball publishes no winner count, so "won" there is only
+  // "next is under twice the starting jackpot", and a stale page below that ($40M) passes. That covers the
+  // first few draws after a reset and cannot be closed without a winner count.
   if (record.next.annuity === record.last.annuity && record.next.cash === record.last.cash && !won) {
     fail("next jackpot and cash are identical to the last draw's, and the jackpot was not won");
   }

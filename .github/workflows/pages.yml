@@ -133,8 +133,8 @@ jobs:
                 exit 1
               fi
               # Refused before reaching the network: something besides jackpots.js changed in the checkout,
-              # which no retry fixes.
-              dirty=$(git status --porcelain --untracked-files=no)
+              # or an untracked file is in the rebase's way, which no retry fixes.
+              dirty=$(git status --porcelain | grep -v ' jackpots\.js$' || true)
               if [ -n "$dirty" ]; then
                 echo "::error::The pull was refused because the checkout has uncommitted changes besides jackpots.js: $(echo "$dirty" | tr '\n' ' ')"
                 exit 1
@@ -148,7 +148,9 @@ jobs:
             if with_token push origin HEAD:main; then
               exit 0
             fi
-            echo "Push rejected; pulling again."
+            if [ "$try" -lt 3 ]; then
+              echo "Push rejected; pulling again."
+            fi
           done
           echo "::error::The refreshed jackpots.js could not be pushed after three tries."
           exit 1
