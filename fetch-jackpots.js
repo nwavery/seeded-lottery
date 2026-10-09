@@ -275,6 +275,12 @@ function checkFigures(gameId, record) {
   if (record.next.cash < record.last.cash && !won) {
     fail(`next cash ${record.next.cash} is below last cash ${record.last.cash}, and the jackpot was not won`);
   }
+  // A rolled jackpot always grows, so the same pair twice means the next figures were never updated: the
+  // page moved its dates on and left the jackpot block showing the draw just held. Either figure alone may
+  // repeat, since each is rounded.
+  if (record.next.annuity === record.last.annuity && record.next.cash === record.last.cash && !won) {
+    fail("next jackpot and cash are identical to the last draw's, and the jackpot was not won");
+  }
   const sold = record.estimatedTicketsSold;
   if (sold == null || (sold >= TICKETS_SOLD_RANGE[0] && sold <= TICKETS_SOLD_RANGE[1])) return record;
   return { ...record, estimatedTicketsSold: null };
@@ -554,7 +560,15 @@ async function refresh({
   // fetchedAt at the top is when this run happened; each game carries when its figures were fetched.
   const out = { fetchedAt: stamp, games: {} };
   for (const [id, outcome] of Object.entries(outcomes)) {
-    out.games[id] = mergeGame(previous && previous.games && previous.games[id], outcome, stamp);
+    const merged = mergeGame(previous && previous.games && previous.games[id], outcome, stamp);
+    // Kept figures were checked when fetched, but perhaps under an older rule. The workflow's check of the
+    // whole file applies today's, and one stale record there would stop the commit and deploy for both games.
+    try {
+      if (merged.lastError) checkGameRecord(id, merged);
+      out.games[id] = merged;
+    } catch (e) {
+      out.games[id] = { error: `${outcome.error}; the last good figures no longer pass: ${e.message}` };
+    }
   }
 
   fs.writeFileSync(file, `// Written by fetch-jackpots.js; rerun it to refresh.\nwindow.JACKPOTS = ${JSON.stringify(out, null, 2)};\n`);

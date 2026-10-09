@@ -312,6 +312,20 @@ test('implausible figures are refused', () => {
   }
 });
 
+test('next figures identical to the last draw are refused unless the jackpot was won', () => {
+  // A rolled jackpot always grows, so the same pair twice means the next figures were never updated.
+  const same = { ...pbRecord(), next: { annuity: 485e6, cash: 199.7e6 } };
+  assert.throws(() => checkFigures('powerball', same), /next jackpot and cash are identical to the last draw's, and the jackpot was not won/);
+  assert.throws(() => checkFigures('megamillions', { ...mmRecord(), next: { ...mmRecord().last }, lastDrawJackpotWinners: 0 }), /identical to the last draw's/);
+  // Neighbours that are real: the annuity rounds to the same figure while cash grew, or the reverse.
+  assert.doesNotThrow(() => checkFigures('powerball', { ...pbRecord(), next: { annuity: 485e6, cash: 199.8e6 } }));
+  assert.doesNotThrow(() => checkFigures('powerball', { ...pbRecord(), next: { annuity: 490e6, cash: 199.7e6 } }));
+  // Reset nights repeat a figure legitimately: two wins in a row at the starting jackpot, or a winner reported.
+  const twice = { ...pbRecord(), last: { annuity: 20e6, cash: 9.2e6 }, next: { annuity: 20e6, cash: 9.2e6 }, estimatedTicketsSold: null };
+  assert.doesNotThrow(() => checkFigures('powerball', twice));
+  assert.doesNotThrow(() => checkFigures('megamillions', { ...mmRecord(), next: { ...mmRecord().last }, lastDrawJackpotWinners: 1 }));
+});
+
 test('a won jackpot may reset: the cash value falls', () => {
   const reset = { ...pbRecord(), next: { annuity: 20e6, cash: 9.2e6 }, estimatedTicketsSold: null };
   assert.deepEqual(checkFigures('powerball', reset), reset);

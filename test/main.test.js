@@ -188,6 +188,37 @@ test('figures stuck on an old draw are refused even when the next draw time is c
   assert.match(pb.data.games.powerball.error, /the next draw is 2026-10-12, but the draw after 2026-10-07 is 2026-10-10/);
 });
 
+test('Powerball figures left on Saturday while the dates moved to Monday are refused', async () => {
+  // Both pages agree the last draw was Saturday and the countdown says Monday, so every date passes, but the
+  // Estimated Jackpot block still shows Saturday's figures: the same pair the results page reports.
+  const monday = fixture('powerball-home.html')
+    .replace('Sat, Oct 10, 2026', 'Mon, Oct 12, 2026')
+    .replace('Wed, Oct 7, 2026', 'Sat, Oct 10, 2026')
+    .replace('2026-10-11T02:59:00.0000000Z', '2026-10-13T02:59:00.0000000Z')
+    .replace('$516 Million', '$485 Million')
+    .replace('$211.6 Million', '$199.7 Million');
+  const { parsePowerballHome } = require('../fetch-jackpots.js');
+  assert.deepEqual(parsePowerballHome(monday), { lastDrawDate: 'Sat, Oct 10, 2026', nextDrawDate: 'Mon, Oct 12, 2026', nextDrawAt: '2026-10-13T02:59:00.000Z', annuity: 485e6, cash: 199.7e6 });
+  const results = fixture('powerball-latest-draw.html').replace('Wed, Oct 7, 2026', 'Sat, Oct 10, 2026');
+  const { code, data } = await run({ now: new Date('2026-10-11T10:23:00Z'), sites: { [URLS.powerballHome]: monday, [URLS.powerballLastDraw]: results } });
+  assert.equal(code, 1);
+  assert.match(data.games.powerball.error, /identical to the last draw's/);
+});
+
+test('kept figures that no longer pass the checks are dropped, not left to stop the deploy', async () => {
+  // A record written before a rule tightened: Powerball's next draw is not the one after its last. With its
+  // fetch failing, keeping it would put a record in the file that the workflow's check rejects whole.
+  const first = await run();
+  const older = first.text.replace('"nextDrawDate": "Sat, Oct 10, 2026"', '"nextDrawDate": "Mon, Oct 12, 2026"').replace('"nextDrawAt": "2026-10-11T02:59:00.000Z"', '"nextDrawAt": "2026-10-13T02:59:00.000Z"');
+  assert.notEqual(older, first.text);
+  const { code, data } = await run({ previous: older, now: LATER, sites: { [URLS.powerballHome]: forbidden(403) } });
+  assert.equal(code, 1);
+  assert.deepEqual(Object.keys(data.games.powerball), ['error']);
+  assert.match(data.games.powerball.error, /HTTP 403 .*; the last good figures no longer pass: the next draw is 2026-10-12/);
+  assert.equal(data.games.megamillions.fetchedAt, LATER.toISOString());
+  assert.doesNotThrow(() => checkJackpotsData(data));
+});
+
 test('a record the page could not show is a failed fetch for that game, not a failed run', async () => {
   // The next-drawing title holding only whitespace. Left to the workflow's file check, it would stop the
   // commit and the deploy for both games, every day; here Powerball keeps its last good figures.
