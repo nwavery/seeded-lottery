@@ -1095,14 +1095,9 @@
       return;
     }
 
-    // Break-even is computed in the form you take the money. Show it as the headline jackpot, which is the
-    // number people compare against, and as cash, converting at today's cash-to-jackpot ratio.
-    const cashRatio = cash != null && advertised > 0 ? cash / advertised : null;
-    const breakEven = (r) => {
-      const asJackpot = payout === 'cash' ? (cashRatio ? r.breakEvenJackpot / cashRatio : null) : r.breakEvenJackpot;
-      const asCash = payout === 'cash' ? r.breakEvenJackpot : (cashRatio ? r.breakEvenJackpot * cashRatio : null);
-      return { asJackpot, asCash };
-    };
+    // Break-even comes out in the form you take the money: a cash value with Cash selected, the advertised
+    // (annuity) jackpot with Annuity selected. Shown only in that form, so it compares with the figure above.
+    const breakEvenLabel = payout === 'cash' ? 'Break-even cash value, at today’s sales' : 'Break-even jackpot, at today’s sales';
 
     const cols = results.length;
     const row = (label, cells, cls = '') =>
@@ -1117,8 +1112,7 @@
         ${row('Average multiplier on them', results.map(({ r }) => `${r.multiplier.toFixed(1)}x`), 'sub')}
         ${row('From the jackpot', results.map(({ r }) => money(r.jackpotPart)))}
         ${rule}
-        ${row('Break-even jackpot, at today’s sales', results.map(({ r }) => { const b = breakEven(r).asJackpot; return b == null ? 'n/a' : money(b); }))}
-        ${row('cash option at that jackpot', results.map(({ r }) => { const b = breakEven(r).asCash; return b == null ? 'n/a' : money(b); }), 'sub')}
+        ${row(breakEvenLabel, results.map(({ r }) => money(r.breakEvenJackpot)))}
       </div>
       <p class="shared" style="margin-top: var(--s-3)">
         If you win, you keep ${Math.round(results[0].r.jackpotShare * 100)}% of the jackpot on average${sold == null ? ' (sales unknown, so assuming no other winners)' : `, with ${round(sold / 1e6, 1)}M plays projected`}.

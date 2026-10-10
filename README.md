@@ -39,8 +39,9 @@ Expected winnings per ticket, after tax, over the ticket price:
 - Projected plays come from how much the lottery says the jackpot's cash value will grow: Powerball puts
   32.5% of base sales into it, Mega Millions 27.63%. The lotteries project low; recent Powerball draws sold
   about 10% more.
-- The break-even jackpot is shown as the advertised figure and as cash, holding sales at today's level.
-  Bigger jackpots sell more tickets, so the real break-even is higher.
+- The break-even is shown in the form you take the money (the cash value with Cash selected, the advertised
+  jackpot with Annuity), holding sales at today's level. Bigger jackpots sell more tickets, so the real
+  break-even is higher.
 
 Neither game has a public API. Mega Millions' site calls a JSON endpoint of its own; Powerball's figures are
 read from its page HTML. Both can change without notice, so `fetch-jackpots.js` fails loudly rather than
