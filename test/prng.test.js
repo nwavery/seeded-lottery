@@ -2,7 +2,7 @@
 const test = require('node:test');
 const { createHash } = require('node:crypto');
 const assert = require('node:assert/strict');
-const { GAMES, jackpotOdds, sha256, sha256Bytes, toHex, Xoshiro256, validateGame, drawTicket, generate } = require('../prng.js');
+const { GAMES, jackpotOdds, sha256, sha256Bytes, toHex, Xoshiro256, validateGame, drawTicket, generate, usDate } = require('../prng.js');
 
 test('sha256 matches the FIPS 180-2 "abc" vector', () => {
   assert.equal(toHex(sha256('abc')), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
@@ -72,12 +72,6 @@ test('every combination of a small game is equally likely', () => {
   assert.ok(chi2 < 27.88, `chi-square ${chi2.toFixed(2)}`);
 });
 
-test('the same string always gives the same tickets', () => {
-  for (const game of Object.values(GAMES)) {
-    assert.deepEqual(generate('2026-10-09', game, 5), generate('2026-10-09', game, 5));
-  }
-});
-
 test('ticket k does not depend on how many tickets were asked for', () => {
   const three = generate('prefix', GAMES.megamillions, 3);
   const ten = generate('prefix', GAMES.megamillions, 10);
@@ -113,21 +107,42 @@ test('both games match their published jackpot odds', () => {
 
 test('impossible games are refused', () => {
   assert.throws(() => validateGame({ pools: [{ label: 'Main', count: 7, max: 6 }] }), /can't pick 7/);
-  assert.throws(() => validateGame({ pools: [{ label: 'Main', count: 0, max: 6 }] }));
+  assert.throws(() => validateGame({ pools: [{ label: 'Main', count: 0, max: 6 }] }), /can't pick 0/);
   assert.throws(() => validateGame({ pools: [{ label: 'Main', count: 1.5, max: 6 }] }), /whole numbers/);
-  assert.throws(() => validateGame({ pools: [] }));
+  assert.throws(() => validateGame({ pools: [] }), /at least one pool/);
+});
+
+test('the date chips write a date one way: month/day/year, no leading zeros', () => {
+  // The seed is the exact text, so a chip that wrote 10/09/2026 one day would re-seed every date ticket.
+  assert.equal(usDate(2026, 10, 9), '10/9/2026');
+  assert.equal(usDate(2027, 1, 5), '1/5/2027');
+  assert.equal(usDate(1999, 12, 31), '12/31/1999');
+  // The birthday picker passes its select values, which are strings.
+  assert.equal(usDate('2026', '10', '09'), '10/9/2026');
+  for (const bad of [[2026, 10, ''], [2026, 'Oct', 9], [2026, 10.5, 9], [2026, 13, 9], [2026, 10, 32], [2026, 0, 9]]) {
+    assert.throws(() => usDate(...bad), /not a date/, JSON.stringify(bad));
+  }
 });
 
 test('the draw for a pinned input has not changed', () => {
   // Regression pin: if this fails, every ticket anyone has generated is different now.
   // Only update it on a deliberate change to the contract described at the top of prng.js.
-  const { hashHex, tickets } = generate('2026-10-09', GAMES.powerball);
-  assert.equal(hashHex, PINNED.hashHex);
-  assert.deepEqual(tickets[0], PINNED.ticket);
+  // Three tickets, so a change to how later tickets draw from the stream fails too, and the seed is what the
+  // "today" chip writes on 10/9/2026.
+  for (const [id, pinned] of Object.entries(PINNED.tickets)) {
+    const { hashHex, tickets } = generate(PINNED.seed, GAMES[id], 3);
+    assert.equal(hashHex, PINNED.hashHex, id);
+    assert.deepEqual(tickets.map((t) => t.map((pool) => pool.numbers)), pinned, id);
+    assert.deepEqual(tickets[0].map((pool) => pool.label), GAMES[id].pools.map((pool) => pool.label), id);
+  }
 });
 
 const PINNED = {
-  // Same as `printf '%s' '2026-10-09' | shasum -a 256`.
-  hashHex: 'c894114fbc6a6bec76419aa2d9ebfdb7d19ddc9212c0d59b25aadf488b032a1c',
-  ticket: [{ label: 'White balls', numbers: [2, 22, 38, 60, 65] }, { label: 'Powerball', numbers: [11] }],
+  seed: '10/9/2026',
+  // Same as `printf '%s' '10/9/2026' | shasum -a 256`.
+  hashHex: '5b44d768f3028f9d615b0030e40bfae9c94a5352e4bd578ff74750d80431a4f6',
+  tickets: {
+    powerball: [[[5, 13, 14, 19, 65], [24]], [[13, 20, 24, 38, 60], [6]], [[1, 27, 42, 43, 45], [14]]],
+    megamillions: [[[5, 20, 37, 39, 56], [4]], [[7, 10, 37, 39, 63], [4]], [[35, 45, 63, 66, 69], [8]]],
+  },
 };

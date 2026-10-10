@@ -3,8 +3,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parseDollars, parsePowerballHome, parsePowerballLastDraw, combinePowerball, parseMegaMillions, megaMillionsTableDrift } = require('../fetch-jackpots.js');
+const { parseDollars, parsePowerballHome, parsePowerballLastDraw, combinePowerball, parseMegaMillions, megaMillionsTableDrift, checkFigures, checkGameRecord, easternWallTime, refusePastDraw } = require('../fetch-jackpots.js');
 const { PAYOUTS } = require('../roi.js');
+const { GAMES } = require('../prng.js');
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8');
 
@@ -25,6 +26,8 @@ test('powerball.com home page: the coming draw', () => {
   assert.deepEqual(parsePowerballHome(fixture('powerball-home.html')), {
     lastDrawDate: 'Wed, Oct 7, 2026',
     nextDrawDate: 'Sat, Oct 10, 2026',
+    // The card's own UTC countdown target: 10:59 PM EDT on Saturday.
+    nextDrawAt: '2026-10-11T02:59:00.000Z',
     annuity: 516e6,
     cash: 211.6e6,
   });
@@ -35,6 +38,7 @@ test('the two Powerball pages combine when they describe the same last draw', ()
   assert.deepEqual(pb, {
     lastDrawDate: 'Wed, Oct 7, 2026',
     nextDrawDate: 'Sat, Oct 10, 2026',
+    nextDrawAt: '2026-10-11T02:59:00.000Z',
     last: { annuity: 485e6, cash: 199.7e6 },
     next: { annuity: 516e6, cash: 211.6e6 },
   });
@@ -66,7 +70,16 @@ test('powerball.com draw result: the draw just held', () => {
     annuity: 485e6,
     cash: 199.7e6,
   });
-  assert.throws(() => parsePowerballLastDraw(fixture('powerball-home.html').replace(/cash-value/g, 'x')));
+});
+
+test('powerball.com draw result with either figure block missing fails, naming the block', () => {
+  // Each block removed alone from the draw-result page, so the other one is still there to be misread.
+  const html = fixture('powerball-latest-draw.html');
+  for (const cls of ['cash-value', 'estimated-jackpot']) {
+    const planted = html.replace(new RegExp(cls, 'g'), 'x');
+    assert.notEqual(planted, html);
+    assert.throws(() => parsePowerballLastDraw(planted), new RegExp(`no "${cls}" block`), cls);
+  }
 });
 
 test('megamillions.com endpoint: last and next draw', () => {
@@ -75,7 +88,10 @@ test('megamillions.com endpoint: last and next draw', () => {
   assert.deepEqual(mm.next, { annuity: 364e6, cash: 147.3e6 });
   assert.equal(mm.lastDrawDate, '2026-10-06');
   assert.equal(mm.nextDrawDate, '2026-10-09');
+  // NextDrawingDate is 2026-10-09T23:00:00 with no zone: 11 PM Eastern, which is 03:00 UTC the next day.
+  assert.equal(mm.nextDrawAt, '2026-10-10T03:00:00.000Z');
   assert.equal(mm.ticketPrice, 5);
+  assert.equal(mm.jackpotVerified, true);
 });
 
 test('megamillions.com endpoint with a missing jackpot fails', () => {
@@ -86,7 +102,7 @@ test('megamillions.com endpoint with a missing jackpot fails', () => {
 });
 
 test("the site's Mega Millions prize table agrees with roi.js", () => {
-  assert.deepEqual(megaMillionsTableDrift(parseMegaMillions(fixture('megamillions-latest.json')), PAYOUTS), []);
+  assert.deepEqual(megaMillionsTableDrift(parseMegaMillions(fixture('megamillions-latest.json')), PAYOUTS, GAMES), []);
 });
 
 test('a changed Mega Millions prize table is reported', () => {
@@ -94,14 +110,14 @@ test('a changed Mega Millions prize table is reported', () => {
   // PAYOUTS holds functions, so copy the one entry being changed by hand rather than structuredClone.
   const withMega = (change) => ({ ...PAYOUTS, megamillions: change({ ...PAYOUTS.megamillions, prizes: { ...PAYOUTS.megamillions.prizes } }) });
   const changed = withMega((m) => ({ ...m, price: 2, prizes: { ...m.prizes, '4+0': 600 } }));
-  const drift = megaMillionsTableDrift(mm, changed);
-  assert.ok(drift.some((d) => d.startsWith('4+0 at 2x')), drift.join('\n'));
-  assert.ok(drift.some((d) => d.startsWith('price')), drift.join('\n'));
+  const drift = megaMillionsTableDrift(mm, changed, GAMES);
+  assert.ok(drift.includes('tier "4+0" at 2x: site 1000, roi.js 1200'), drift.join('\n'));
+  assert.ok(drift.includes('price: site 5, roi.js 2'), drift.join('\n'));
 
   const missingTier = withMega((m) => ({ ...m, prizes: { ...m.prizes, '9+9': 1 } }));
-  assert.ok(megaMillionsTableDrift(mm, missingTier).some((d) => d.startsWith('9+9')));
+  assert.deepEqual(megaMillionsTableDrift(mm, missingTier, GAMES), ['tier "9+9": in roi.js, not on the site']);
 
-  assert.ok(megaMillionsTableDrift({ ...mm, prizeTiers: [] }, PAYOUTS).some((d) => /no prize tiers/.test(d)));
+  assert.ok(megaMillionsTableDrift({ ...mm, prizeTiers: [] }, PAYOUTS, GAMES).some((d) => /no prize tiers/.test(d)));
 });
 
 const { readPrevious, mergeGame } = require('../fetch-jackpots.js');
@@ -133,4 +149,231 @@ test('a failed fetch keeps the last good figures with their own date, and says w
 test('a failed fetch with nothing good to keep is just the error', () => {
   assert.deepEqual(mergeGame(undefined, { ok: false, error: 'HTTP 403' }, 'now'), { error: 'HTTP 403' });
   assert.deepEqual(mergeGame({ error: 'earlier' }, { ok: false, error: 'HTTP 403' }, 'now'), { error: 'HTTP 403' });
+});
+
+// Fixture edits. Each plants one problem in an otherwise real response.
+const home = fixture('powerball-home.html');
+const mmWith = (change) => {
+  const d = JSON.parse(JSON.parse(fixture('megamillions-latest.json')).d);
+  change(d);
+  return JSON.stringify({ d: JSON.stringify(d) });
+};
+const thrown = (fn) => {
+  try {
+    fn();
+  } catch (e) {
+    return e;
+  }
+  assert.fail('expected a throw');
+};
+
+test('powerball.com home page missing only its annuity figure fails rather than reading the cash value', () => {
+  // The cash figure sits right below, so a search that runs past "Cash Value" reads it as the jackpot.
+  const planted = home.replace('<span class="game-jackpot-number text-xxxl lh-1 text-center">$516 Million</span>', '');
+  assert.notEqual(planted, home);
+  assert.throws(() => parsePowerballHome(planted), /no figure after "Estimated Jackpot"/);
+});
+
+test("powerball.com home page missing only its cash figure fails rather than reading the next card's number", () => {
+  // A figure just past the cash group, as another card's would be: inside a fixed window, outside the group.
+  const planted = home
+    .replace('<span class="game-jackpot-number text-lg lh-1 text-center">$211.6 Million</span>', '')
+    .replace('<div class="col" id="winners">', '<div class="col" id="winners"><span class="game-jackpot-number">$2 Million</span>');
+  assert.equal(planted.match(/game-jackpot-number/g).length, 2);
+  assert.throws(() => parsePowerballHome(planted), /no figure after "Cash Value"/);
+});
+
+test('powerball.com home page with "Cash Value" only before "Estimated Jackpot" fails', () => {
+  const planted = home.replace(/Cash Value/, 'Prize').replace('Next Drawing', 'Cash Value');
+  assert.throws(() => parsePowerballHome(planted), /no "Cash Value" label after "Estimated Jackpot"/);
+});
+
+test('powerball.com home page: the next draw time comes only from the next-drawing card', () => {
+  const missing = home.replace('data-drawdateutc="2026-10-11T02:59:00.0000000Z"', '');
+  assert.throws(() => parsePowerballHome(missing), /no draw time in the "next-drawing" card/);
+  // Another card's countdown further down must not stand in for it.
+  const elsewhere = missing.replace('<div class="col" id="winners">', '<div class="col" id="winners"><div data-drawdateutc="2026-10-14T02:59:00Z"></div>');
+  assert.throws(() => parsePowerballHome(elsewhere), /no draw time in the "next-drawing" card/);
+  const local = home.replace('2026-10-11T02:59:00.0000000Z', '2026-10-10T22:59:00');
+  assert.throws(() => parsePowerballHome(local), /not a UTC draw time: "2026-10-10T22:59:00"/);
+});
+
+test('Eastern wall time is read with the offset in force on that date', () => {
+  assert.equal(easternWallTime('2026-10-09T23:00:00'), '2026-10-10T03:00:00.000Z', 'EDT');
+  // Daylight time ends 2026-11-01. The draws either side of it are an hour apart in UTC.
+  assert.equal(easternWallTime('2026-10-30T23:00:00'), '2026-10-31T03:00:00.000Z', 'Friday before, EDT');
+  assert.equal(easternWallTime('2026-11-03T23:00:00'), '2026-11-04T04:00:00.000Z', 'Tuesday after, EST');
+  assert.equal(easternWallTime('2027-01-15T23:00:00.000'), '2027-01-16T04:00:00.000Z', 'winter, fractional seconds');
+  assert.equal(easternWallTime('2026-03-10T23:00:00'), '2026-03-11T03:00:00.000Z', 'after the March change');
+  // A zone on the text means it is not wall time; 2:30 AM on 2026-03-08 does not exist in New York.
+  for (const bad of ['2026-10-09T23:00:00Z', '2026-10-09T23:00:00-04:00', '2026-10-09', 'Fri, Oct 9', '2026-03-08T02:30:00', undefined]) {
+    assert.throws(() => easternWallTime(bad), /not an Eastern wall time/, String(bad));
+  }
+});
+
+test('a draw time that has passed is refused; one still ahead is not', () => {
+  const rec = { nextDrawAt: '2026-10-10T03:00:00.000Z' };
+  // 01:30 UTC on the 10th is 9:30 PM on the 9th in New York: draw night, and the draw is still ahead.
+  assert.doesNotThrow(() => refusePastDraw(rec, new Date('2026-10-10T01:30:00Z')));
+  assert.doesNotThrow(() => refusePastDraw(rec, new Date('2026-10-10T02:59:59.999Z')));
+  assert.throws(() => refusePastDraw(rec, new Date('2026-10-10T03:00:00Z')), /next draw 2026-10-10T03:00:00.000Z has already happened/);
+  assert.throws(() => refusePastDraw(rec, new Date('2026-10-12T10:23:00Z')), /already happened/);
+  assert.throws(() => refusePastDraw({}, new Date('2026-10-10T01:30:00Z')), /no next draw time/);
+  assert.throws(() => refusePastDraw({ nextDrawAt: 'soon' }, new Date('2026-10-10T01:30:00Z')), /no next draw time/);
+});
+
+test('Mega Millions figures must belong to the draw the site names as the last one', () => {
+  const ahead = mmWith((d) => { d.Drawing.PlayDate = '2026-10-09T00:00:00'; });
+  assert.throws(() => parseMegaMillions(ahead), /jackpot figures are for "2026-10-06", the last draw is "2026-10-09"/);
+  const noDate = mmWith((d) => { delete d.Jackpot.PlayDate; });
+  assert.throws(() => parseMegaMillions(noDate), /jackpot figures are for undefined, the last draw is "2026-10-06"/);
+  // Both missing is not a match, and nor are both empty.
+  const neither = mmWith((d) => { delete d.Jackpot.PlayDate; delete d.Drawing.PlayDate; });
+  assert.throws(() => parseMegaMillions(neither), /jackpot figures are for undefined, the last draw is undefined/);
+  const empty = mmWith((d) => { d.Jackpot.PlayDate = ''; d.Drawing.PlayDate = ''; });
+  assert.throws(() => parseMegaMillions(empty), /jackpot figures are for "", the last draw is ""/);
+  const junk = mmWith((d) => { d.Jackpot.PlayDate = 'TBD'; d.Drawing.PlayDate = 'TBD'; });
+  assert.throws(() => parseMegaMillions(junk), /jackpot figures are for "TBD", the last draw is "TBD"/);
+  // Verified is read but not enforced until live data shows when it flips.
+  assert.equal(parseMegaMillions(mmWith((d) => { d.Jackpot.Verified = false; })).jackpotVerified, false);
+  assert.throws(() => parseMegaMillions(mmWith((d) => { delete d.NextDrawingDate; })), /megamillions.com: NextDrawingDate: not an Eastern wall time/);
+});
+
+test("the site's Mega Millions ball ranges agree with prng.js, and a change is reported", () => {
+  const mm = parseMegaMillions(fixture('megamillions-latest.json'));
+  assert.deepEqual(mm.ballRanges, { white: 70, mega: 24 });
+  assert.deepEqual(megaMillionsTableDrift(mm, PAYOUTS, GAMES), []);
+  // The April 2025 change was the gold ball, 25 to 24. The prize table does not have to move with it.
+  const mega = megaMillionsTableDrift(parseMegaMillions(mmWith((d) => { d.PrizeMatrix.MegaBallMax = 25; })), PAYOUTS, GAMES);
+  assert.deepEqual(mega, ['Mega Ball range: site 1 to 25, prng.js 1 to 24']);
+  const white = megaMillionsTableDrift(parseMegaMillions(mmWith((d) => { d.PrizeMatrix.WhiteBallMax = 69; })), PAYOUTS, GAMES);
+  assert.deepEqual(white, ['White balls range: site 1 to 69, prng.js 1 to 70']);
+  const gone = megaMillionsTableDrift(parseMegaMillions(mmWith((d) => { delete d.PrizeMatrix.WhiteBallMax; })), PAYOUTS, GAMES);
+  assert.deepEqual(gone, ['White balls range: site 1 to undefined, prng.js 1 to 70']);
+});
+
+test('scraped values in error and drift messages are quoted, so a newline cannot start a log line', () => {
+  const err = thrown(() => parseMegaMillions(mmWith((d) => { d.Jackpot.NextPrizePool = '0\n::warning title=planted::x'; })));
+  assert.match(err.message, /NextPrizePool missing or not positive: "0\\n::warning/);
+  assert.doesNotMatch(err.message, /[\r\n]/);
+
+  // A carriage return alone, in a date captured as free text.
+  const results = { ...parsePowerballLastDraw(fixture('powerball-latest-draw.html')), drawDate: 'Wed, Oct 7,\r::error::x 2026' };
+  assert.doesNotMatch(thrown(() => combinePowerball(parsePowerballHome(home), results)).message, /[\r\n]/);
+
+  const mm = parseMegaMillions(mmWith((d) => {
+    d.PrizeMatrix.PrizeTiers[1].TierWhiteBall = '\n::error::x';
+    d.PrizeMatrix.TicketPrice = '\n::error::y';
+    d.PrizeMatrix.PrizeTiers[2].Mega2 = '\r\n::error::z';
+    d.PrizeMatrix.MegaBallMax = '\n::error::w';
+  }));
+  const drift = megaMillionsTableDrift(mm, PAYOUTS, GAMES);
+  for (const planted of ['x', 'y', 'z', 'w']) assert.ok(drift.some((line) => line.includes(`::error::${planted}`)), `${planted}: ${drift.join(' | ')}`);
+  for (const line of drift) assert.doesNotMatch(line, /[\r\n]/);
+});
+
+// The plausibility gate. Records as main() builds them, from today's fixtures.
+const pbRecord = () => ({
+  ...combinePowerball(parsePowerballHome(home), parsePowerballLastDraw(fixture('powerball-latest-draw.html'))),
+  estimatedTicketsSold: 18307692,
+});
+const mmRecord = () => {
+  const mm = parseMegaMillions(fixture('megamillions-latest.json'));
+  return { last: mm.last, next: mm.next, lastDrawJackpotWinners: mm.lastDrawJackpotWinners, estimatedTicketsSold: 5573652 };
+};
+
+test("today's figures pass the plausibility gate unchanged", () => {
+  assert.deepEqual(checkFigures('powerball', pbRecord()), pbRecord());
+  assert.deepEqual(checkFigures('megamillions', mmRecord()), mmRecord());
+});
+
+test('implausible figures are refused', () => {
+  const planted = [
+    // [what, game, change, message]
+    ['Mega Millions reported in millions', 'megamillions', (r) => { r.next = { annuity: 364, cash: 147.3 }; }, /next: annuity 364 is outside 20000000 to 5000000000/],
+    ['cash and annuity swapped', 'powerball', (r) => { r.next = { annuity: 211.6e6, cash: 516e6 }; }, /next: needs annuity > cash > 0, got annuity 211600000, cash 516000000/],
+    ['cash equal to annuity', 'powerball', (r) => { r.last = { annuity: 485e6, cash: 485e6 }; }, /last: needs annuity > cash > 0/],
+    ['a missing figure', 'megamillions', (r) => { r.next = { annuity: 364e6, cash: null }; }, /next: needs annuity > cash > 0/],
+    ['no last figures at all', 'megamillions', (r) => { delete r.last; }, /last: missing/],
+    ['NaN', 'powerball', (r) => { r.next.annuity = NaN; }, /next: needs annuity > cash > 0/],
+    ['cash too close to the annuity', 'powerball', (r) => { r.next.cash = 0.9 * r.next.annuity; }, /next: cash is 0.9 of the annuity, outside 0.2 to 0.9/],
+    ['cash too small a share', 'megamillions', (r) => { r.last.cash = 0.2 * r.last.annuity; }, /last: cash is 0.2 of the annuity/],
+    ['a units slip on the cash only', 'powerball', (r) => { r.next.cash = 21.16e6; }, /next: cash is 0.041 of the annuity/],
+    ['an annuity over $5 billion', 'powerball', (r) => { r.next = { annuity: 5.16e11, cash: 2.116e11 }; }, /next: annuity 516000000000 is outside/],
+    ['an annuity under $20 million', 'powerball', (r) => { r.last = { annuity: 19.9e6, cash: 9e6 }; }, /last: annuity 19900000 is outside/],
+    ['cash fell with no winner', 'powerball', (r) => { r.next = { annuity: 480e6, cash: 199.6e6 }; }, /next cash 199600000 is below last cash 199700000, and the jackpot was not won/],
+    ['cash fell, jackpot at exactly twice the start', 'powerball', (r) => { r.next = { annuity: 40e6, cash: 18e6 }; }, /was not won/],
+    ['cash fell, Mega Millions at twice its $50M start, no winners', 'megamillions', (r) => { r.next = { annuity: 100e6, cash: 45e6 }; r.lastDrawJackpotWinners = 0; }, /was not won/],
+  ];
+  for (const [what, game, change, message] of planted) {
+    const r = game === 'powerball' ? pbRecord() : mmRecord();
+    change(r);
+    assert.throws(() => checkFigures(game, r), message, what);
+  }
+});
+
+test('next figures identical to the last draw are refused unless the jackpot was won', () => {
+  // A rolled jackpot always grows, so the same pair twice means the next figures were never updated.
+  const same = { ...pbRecord(), next: { annuity: 485e6, cash: 199.7e6 } };
+  assert.throws(() => checkFigures('powerball', same), /next jackpot and cash are identical to the last draw's, and the jackpot was not won/);
+  assert.throws(() => checkFigures('megamillions', { ...mmRecord(), next: { ...mmRecord().last }, lastDrawJackpotWinners: 0 }), /identical to the last draw's/);
+  // Neighbours that are real: the annuity rounds to the same figure while cash grew, or the reverse.
+  assert.doesNotThrow(() => checkFigures('powerball', { ...pbRecord(), next: { annuity: 485e6, cash: 199.8e6 } }));
+  assert.doesNotThrow(() => checkFigures('powerball', { ...pbRecord(), next: { annuity: 490e6, cash: 199.7e6 } }));
+  // Reset nights repeat a figure legitimately: two wins in a row at the starting jackpot, or a winner reported.
+  const twice = { ...pbRecord(), last: { annuity: 20e6, cash: 9.2e6 }, next: { annuity: 20e6, cash: 9.2e6 }, estimatedTicketsSold: null };
+  assert.doesNotThrow(() => checkFigures('powerball', twice));
+  assert.doesNotThrow(() => checkFigures('megamillions', { ...mmRecord(), next: { ...mmRecord().last }, lastDrawJackpotWinners: 1 }));
+});
+
+test('a won jackpot may reset: the cash value falls', () => {
+  const reset = { ...pbRecord(), next: { annuity: 20e6, cash: 9.2e6 }, estimatedTicketsSold: null };
+  assert.deepEqual(checkFigures('powerball', reset), reset);
+  assert.doesNotThrow(() => checkFigures('powerball', { ...reset, next: { annuity: 39.9e6, cash: 18e6 } }));
+  // Mega Millions says how many won, so a reset above twice the start still counts.
+  const won = { ...mmRecord(), next: { annuity: 120e6, cash: 54e6 }, lastDrawJackpotWinners: 1, estimatedTicketsSold: null };
+  assert.deepEqual(checkFigures('megamillions', won), won);
+  // Its own start is $50M, not Powerball's $20M: $60M is still a reset even before Winners catches up.
+  assert.doesNotThrow(() => checkFigures('megamillions', { ...won, next: { annuity: 60e6, cash: 27e6 }, lastDrawJackpotWinners: 0 }));
+});
+
+test('the next draw must be the scheduled draw straight after the last one', () => {
+  const stamped = (r) => ({ ...r, fetchedAt: '2026-10-09T22:18:18.301Z' });
+  const pb = stamped(pbRecord());
+  const mm = stamped({ ...mmRecord(), lastDrawDate: '2026-10-06', nextDrawDate: '2026-10-09', nextDrawAt: '2026-10-10T03:00:00.000Z' });
+  assert.doesNotThrow(() => checkGameRecord('powerball', pb));
+  assert.doesNotThrow(() => checkGameRecord('megamillions', mm));
+  // Every pairing in each game's week, including the ones that wrap past Sunday.
+  const at = (date, hour) => new Date(`${date}T${hour}:00.000Z`).toISOString();
+  for (const [last, next, nextAt] of [['Mon, Oct 5, 2026', 'Wed, Oct 7, 2026', at('2026-10-08', '02:59')], ['Wed, Oct 7, 2026', 'Sat, Oct 10, 2026', at('2026-10-11', '02:59')], ['Sat, Oct 10, 2026', 'Mon, Oct 12, 2026', at('2026-10-13', '02:59')]]) {
+    assert.doesNotThrow(() => checkGameRecord('powerball', { ...pb, lastDrawDate: last, nextDrawDate: next, nextDrawAt: nextAt }), `${last} to ${next}`);
+  }
+  for (const [last, next, nextAt] of [['2026-10-06', '2026-10-09', at('2026-10-10', '03:00')], ['2026-10-09', '2026-10-13', at('2026-10-14', '03:00')]]) {
+    assert.doesNotThrow(() => checkGameRecord('megamillions', { ...mm, lastDrawDate: last, nextDrawDate: next, nextDrawAt: nextAt }), `${last} to ${next}`);
+  }
+  const planted = [
+    // [what, game, record, message]
+    // Saturday's draw is skipped across the week boundary: Saturday to Wednesday, missing Monday.
+    ['Powerball skips Monday', 'powerball', { ...pb, lastDrawDate: 'Sat, Oct 10, 2026', nextDrawDate: 'Wed, Oct 14, 2026', nextDrawAt: at('2026-10-15', '02:59') },
+      /the next draw is 2026-10-14, but the draw after 2026-10-10 is 2026-10-12/],
+    ['Mega Millions on a Thursday', 'megamillions', { ...mm, nextDrawDate: '2026-10-08', nextDrawAt: at('2026-10-09', '03:00') }, /the next draw is 2026-10-08, but the draw after 2026-10-06 is 2026-10-09/],
+    // The card's title and its countdown disagree. Either could be the stale one.
+    ['title and countdown disagree', 'powerball', { ...pb, nextDrawAt: at('2026-10-13', '02:59') }, /nextDrawDate 2026-10-10 is not the New York date of nextDrawAt 2026-10-13T02:59:00.000Z, which is 2026-10-12/],
+    // 11 PM in New York is the next day in UTC: the UTC date would match Saturday by accident here.
+    ['date read in UTC', 'megamillions', { ...mm, nextDrawDate: '2026-10-10' }, /not the New York date of nextDrawAt/],
+    ['a date that does not parse', 'powerball', { ...pb, lastDrawDate: 'Wed, Oct 7' }, /lastDrawDate: not a date: "Wed, Oct 7"/],
+    ['an impossible date', 'megamillions', { ...mm, lastDrawDate: '2026-02-30' }, /lastDrawDate: not a date: "2026-02-30"/],
+    ['only whitespace', 'powerball', { ...pb, nextDrawDate: '' }, /nextDrawDate: not a date: ""/],
+  ];
+  for (const [what, game, record, message] of planted) assert.throws(() => checkGameRecord(game, record), message, what);
+  // Kept records from before nextDrawAt existed still get the schedule check, from their date text.
+  const { nextDrawAt, ...older } = pb;
+  assert.throws(() => checkGameRecord('powerball', { ...older, nextDrawDate: 'Mon, Oct 12, 2026' }), /the draw after 2026-10-07 is 2026-10-10/);
+});
+
+test('a sales estimate outside half a million to a billion plays is dropped, not fatal', () => {
+  // A cash rise of one rounding step ($0.1M) reads as about 154,000 Powerball plays: noise, not sales.
+  for (const [sold, kept] of [[153846, null], [499999, null], [5e5, 5e5], [18307692, 18307692], [1e9, 1e9], [1e9 + 1, null], [-5, null]]) {
+    assert.equal(checkFigures('powerball', { ...pbRecord(), estimatedTicketsSold: sold }).estimatedTicketsSold, kept, String(sold));
+  }
 });

@@ -109,6 +109,19 @@
     return Math.round((nextCash - lastCash) / p.jackpotShareOfSales / p.price);
   }
 
+  /** Probability of a "white+bonus" tier key such as "4+1". */
+  function tierOdds(game, tier) {
+    const [white, bonus] = tier.split('+').map(Number);
+    return tierProbability(game, white, bonus === 1);
+  }
+
+  /** Expected fixed-prize winnings per play, before tax, when the multiplier averages `multiplier`. */
+  function fixedPrizeValue(p, game, multiplier) {
+    // Linearity: the multiplier is drawn independently of the numbers, so its mean is all that matters.
+    return Object.entries(p.prizes).reduce((sum, [tier, prize]) =>
+      sum + tierOdds(game, tier) * (tier in p.flatPrizes ? p.flatPrizes[tier] : prize * multiplier), 0);
+  }
+
   /**
    * Expected winnings per play and the return on its price.
    *   play               a PAYOUTS key: 'powerball', 'powerballPowerPlay' or 'megamillions'
@@ -128,20 +141,12 @@
     if (!(taxRate >= 0 && taxRate < 1)) throw new Error('tax rate must be from 0 up to (not including) 100%');
 
     const multiplier = expectedMultiplier(play, advertisedJackpot);
-    let fixed = 0;
-    let anyPrize = 0;
-    for (const [tier, prize] of Object.entries(p.prizes)) {
-      const [white, bonus] = tier.split('+').map(Number);
-      const prob = tierProbability(game, white, bonus === 1);
-      // Linearity: the multiplier is drawn independently of the numbers, so its mean is all that matters.
-      fixed += prob * (tier in p.flatPrizes ? p.flatPrizes[tier] : prize * multiplier);
-      anyPrize += prob;
-    }
+    const fixed = fixedPrizeValue(p, game, multiplier);
 
     const jackpotOdds = 1 / tierProbability(game, game.pools[0].count, true);
     const share = ticketsSold == null ? 1 : expectedJackpotShare(Math.max(0, ticketsSold - 1) / jackpotOdds);
     const jackpotPart = (jackpot * share) / jackpotOdds;
-    anyPrize += 1 / jackpotOdds;
+    const anyPrize = Object.keys(p.prizes).reduce((sum, tier) => sum + tierOdds(game, tier), 1 / jackpotOdds);
 
     const afterTax = (fixed + jackpotPart) * (1 - taxRate);
     return {
@@ -155,7 +160,10 @@
       anyPrizeOdds: 1 / anyPrize,
       // The jackpot at which the play breaks even, at this tax rate and with the share held at today's sales.
       // Sales rise with the jackpot, so the true break-even is higher: about 14% for Powerball in Oct 2026.
-      breakEvenJackpot: (p.price / (1 - taxRate) - fixed) * jackpotOdds / share,
+      // The fixed prizes are priced at the multiplier in play at that jackpot, not today's. Power Play's 10x
+      // goes above $150M and the break-even never gets that low (the least is $649M, at no tax and no sharing),
+      // so pricing it at an unbounded jackpot is exact. A test holds that bound.
+      breakEvenJackpot: (p.price / (1 - taxRate) - fixedPrizeValue(p, game, expectedMultiplier(play, Infinity))) * jackpotOdds / share,
     };
   }
 
