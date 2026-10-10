@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs>
+  <radialGradient id="w" cx="34%" cy="28%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset=".38" stop-color="#f6f3ec"/><stop offset=".72" stop-color="#ddd7ca"/><stop offset="1" stop-color="#a39a88"/></radialGradient>
+  <radialGradient id="r" cx="34%" cy="28%" r="75%"><stop offset="0" stop-color="#ff9d93"/><stop offset=".32" stop-color="#e8404c"/><stop offset=".66" stop-color="#c41f31"/><stop offset="1" stop-color="#6e0a16"/></radialGradient>
+  <radialGradient id="g" cx="34%" cy="28%" r="75%"><stop offset="0" stop-color="#fff6cc"/><stop offset=".34" stop-color="#f9d55a"/><stop offset=".68" stop-color="#e7ad1c"/><stop offset="1" stop-color="#8a5f03"/></radialGradient>
+  <radialGradient id="hi" cx="50%" cy="40%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<circle cx="10.5" cy="11.5" r="8.5" fill="url(#w)"/><ellipse cx="8.12" cy="7.93" rx="3.23" ry="2.04" fill="url(#hi)" transform="rotate(-24 8.12 7.93)"/><circle cx="21.5" cy="11.5" r="8.5" fill="url(#g)"/><ellipse cx="19.12" cy="7.93" rx="3.23" ry="2.04" fill="url(#hi)" transform="rotate(-24 19.12 7.93)"/><circle cx="16" cy="21" r="10" fill="url(#r)"/><ellipse cx="13.2" cy="16.8" rx="3.8" ry="2.4" fill="url(#hi)" transform="rotate(-24 13.2 16.8)"/></svg>

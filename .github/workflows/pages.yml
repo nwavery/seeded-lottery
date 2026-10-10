@@ -165,7 +165,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp index.html prng.js roi.js jackpots.js _site/
+          cp index.html prng.js roi.js jackpots.js favicon.svg favicon-32.png apple-touch-icon.png _site/
 
       # The versions GitHub's Pages documentation pairs together.
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

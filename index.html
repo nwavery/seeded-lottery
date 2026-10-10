@@ -5,59 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>Nathan's Seeded Lottery</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   /* One set of tokens for the whole page: colour, type, space, radius. Dark mode only swaps colours. */
   :root {
     --bg: #f4efe5;
-    --glow-1: rgba(210, 43, 60, .10);
-    --glow-2: rgba(239, 182, 39, .16);
+    --glow-1: rgba(210, 43, 60, .11);
+    --glow-2: rgba(239, 182, 39, .18);
     --card: #fffdf9;
     --sunken: #f7f3ea;
+    --tray: #efe8da;
     --ink: #1d1a15;
     --muted: #5f594e;
     --line: #e6dfd0;
     --line-strong: #cbc1ad;
+    /* Form-control borders: at least 3:1 against the card and the sunken fill. */
+    --control: #8a7f6a;
     --accent: #2c43b8;
-    --accent-soft: rgba(44, 67, 184, .09);
+    --accent-soft: rgba(44, 67, 184, .1);
     --focus: #2c43b8;
     --pb-text: #a51626;
     --mm-text: #835c00;
+    --gold-soft: rgba(239, 182, 39, .42);
     --loss: #b3261e;
     --gain: #1d7a3a;
     --warn-bg: #fff4d6; --warn-line: #e2bd5c; --warn-ink: #5a4100;
     --shadow-sm: 0 1px 2px rgba(48, 36, 12, .08);
-    --shadow: 0 1px 2px rgba(48, 36, 12, .05), 0 14px 32px -18px rgba(48, 36, 12, .28);
+    --shadow: 0 1px 2px rgba(48, 36, 12, .05), 0 14px 32px -18px rgba(48, 36, 12, .3);
+    --ground: rgba(48, 30, 6, .34);
 
     --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     --font-round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 28px; --t-2xl: clamp(36px, 7vw, 52px);
+    --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 20px; --t-xl: 28px;
     --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
-    --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-pill: 999px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 22px; --r-pill: 999px;
     --tap: 44px;
+    --spring: cubic-bezier(.3, 1.45, .5, 1);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12110e;
-      --glow-1: rgba(226, 58, 70, .13);
-      --glow-2: rgba(239, 182, 39, .08);
+      --glow-1: rgba(226, 58, 70, .14);
+      --glow-2: rgba(239, 182, 39, .09);
       --card: #1c1a16;
       --sunken: #15130f;
+      --tray: #100f0c;
       --ink: #f2ede3;
       --muted: #aba395;
       --line: #322e27;
       --line-strong: #4d473c;
+      --control: #7a7262;
       --accent: #a3b0ff;
-      --accent-soft: rgba(163, 176, 255, .12);
+      --accent-soft: rgba(163, 176, 255, .14);
       --focus: #a3b0ff;
       --pb-text: #ff9090;
       --mm-text: #f2c55a;
+      --gold-soft: rgba(239, 182, 39, .3);
       --loss: #ff8f82;
       --gain: #7ed69a;
       --warn-bg: #2a220f; --warn-line: #6b5520; --warn-ink: #f3d68a;
       --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
       --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 36px -18px rgba(0, 0, 0, .7);
+      --ground: rgba(0, 0, 0, .6);
     }
   }
 
@@ -67,8 +80,8 @@
     margin: 0; color: var(--ink);
     background-color: var(--bg);
     background-image:
-      radial-gradient(ellipse 60% 420px at 8% -80px, var(--glow-1), transparent 70%),
-      radial-gradient(ellipse 55% 420px at 96% -60px, var(--glow-2), transparent 70%);
+      radial-gradient(ellipse 60% 460px at 8% -80px, var(--glow-1), transparent 70%),
+      radial-gradient(ellipse 55% 460px at 96% -60px, var(--glow-2), transparent 70%);
     background-repeat: no-repeat;
     font: var(--t-md)/1.5 var(--font);
   }
@@ -78,6 +91,7 @@
   code { font: .92em var(--font-mono); background: var(--sunken); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; overflow-wrap: anywhere; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
 
   .card {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
@@ -91,130 +105,247 @@
   .error { color: var(--loss); font-weight: 600; }
 
   /* ---------- Masthead ---------- */
-  .masthead { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-2); margin-bottom: var(--s-5); }
-  .brand { display: flex; align-items: center; justify-content: center; gap: var(--s-3); }
-  .logo { display: flex; flex: none; }
-  .logo .ball { --size: 30px; animation: none; }
-  .logo .ball + .ball { margin-left: -9px; }
-  h1 { font-size: var(--t-2xl); font-weight: 800; letter-spacing: -0.025em; }
-  .tagline { font-size: var(--t-lg); color: var(--muted); line-height: 1.35; }
+  .masthead { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-3); margin-bottom: var(--s-5); }
+  .brand { display: flex; align-items: center; justify-content: center; gap: var(--s-4); }
+  .logo { display: flex; flex: none; align-items: flex-end; padding-top: 6px; }
+  .logo .ball { --size: 46px; animation: logo-in .7s var(--spring) both; }
+  .logo .ball:nth-child(2) { --size: 52px; margin-left: -12px; z-index: 1; animation-delay: .08s; }
+  .logo .ball:nth-child(3) { margin-left: -12px; animation-delay: .16s; }
+  .logo .ball:hover { animation: hop .45s var(--spring); }
+  @keyframes logo-in { from { transform: translateY(-60%) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes hop { 0% { transform: none; } 40% { transform: translateY(-28%) rotate(-12deg); } 70% { transform: translateY(0) scale(1.08, .92); } 100% { transform: none; } }
+  h1 { text-align: left; font-weight: 850; letter-spacing: -0.03em; }
+  .h1-top {
+    display: block; font: 800 var(--t-sm)/1 var(--font); letter-spacing: .22em; text-transform: uppercase; color: var(--pb-text);
+    margin: 0 0 6px 3px;
+  }
+  .h1-main {
+    display: block; font-size: clamp(34px, 7.4vw, 64px); line-height: 1;
+    /* A gold highlighter stroke under the lower half of the name. */
+    background: linear-gradient(transparent 58%, var(--gold-soft) 58%, var(--gold-soft) 88%, transparent 88%);
+    padding: 0 4px; margin-left: -4px;
+  }
+  .tagline { font-size: var(--t-lg); color: var(--muted); line-height: 1.35; max-width: 34ch; }
   .tagline strong { color: var(--ink); font-weight: 650; }
 
   /* ---------- Seed hero ---------- */
-  .hero { padding: var(--s-5); }
+  .hero { padding: var(--s-5); position: relative; }
   .hero-label { font: 800 var(--t-lg)/1.2 var(--font-round); color: var(--ink); display: block; margin-bottom: var(--s-3); text-align: center; }
   .seed-box { position: relative; }
   textarea#seed {
     display: block; width: 100%; resize: none; overflow: hidden;
-    min-height: 64px; padding: 14px 56px; text-align: center;
-    font: 600 24px/1.3 var(--font-round); color: var(--ink); letter-spacing: -0.01em;
-    background: var(--sunken); border: 2px solid var(--line-strong); border-radius: var(--r-md);
-    transition: border-color .15s, background-color .15s;
+    min-height: 68px; padding: 15px 56px; text-align: center;
+    font: 650 26px/1.3 var(--font-round); color: var(--ink); letter-spacing: -0.01em;
+    background: var(--sunken); border: 2px solid var(--control); border-radius: var(--r-md);
+    transition: border-color .15s, background-color .15s, box-shadow .15s;
   }
   textarea#seed::placeholder { color: var(--muted); font-weight: 500; opacity: 1; }
   textarea#seed:focus { outline: none; border-color: var(--focus); background: var(--card); box-shadow: 0 0 0 4px var(--accent-soft); }
   .clear {
-    position: absolute; top: 10px; right: 10px; width: var(--tap); height: var(--tap);
+    position: absolute; top: 12px; right: 10px; width: var(--tap); height: var(--tap);
     display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-pill);
-    background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer;
+    background: transparent; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer;
+    transition: background-color .15s, color .15s, transform .25s var(--spring);
   }
-  .clear:hover { background: var(--line); color: var(--ink); }
-  .clear[hidden] { display: none; }
+  .clear:hover { background: var(--line); color: var(--ink); transform: rotate(90deg); }
+  .clear:active { transform: rotate(90deg) scale(.85); }
   .hero .hint { margin-top: var(--s-3); text-align: center; }
 
   .chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-3); }
   .chips-label { font-size: var(--t-sm); color: var(--muted); margin-right: var(--s-1); }
   .chip {
-    display: inline-flex; align-items: center; gap: var(--s-2); min-height: 40px; max-width: 100%;
-    padding: 0 var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r-pill);
+    display: inline-flex; align-items: center; gap: var(--s-2); min-height: 40px; max-width: 100%; flex: none;
+    padding: 0 var(--s-4) 0 var(--s-3); border: 1px solid var(--control); border-radius: var(--r-pill);
     background: var(--card); color: var(--ink); font: 500 var(--t-sm)/1 var(--font); cursor: pointer;
-    transition: background-color .15s, border-color .15s, transform .1s;
+    transition: background-color .18s, border-color .18s, color .18s, transform .25s var(--spring), box-shadow .18s;
   }
-  .chip:hover { border-color: var(--ink); }
-  .chip:active { transform: translateY(1px); }
+  /* A little ball on every chip; it rolls when you point at the chip. */
+  .chip::before {
+    content: ""; flex: none; width: 14px; height: 14px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff 0 15%, #e9e3d6 55%, #a99f8b 100%);
+    box-shadow: inset -1px -1px 2px rgba(0, 0, 0, .2);
+    transition: transform .4s var(--spring), background .18s;
+  }
+  .chip:nth-of-type(2n)::before { background: radial-gradient(circle at 35% 30%, #ffb3ab 0 12%, #d42a3a 50%, #8f1222 100%); }
+  .chip:nth-of-type(3n)::before { background: radial-gradient(circle at 35% 30%, #fff6cc 0 12%, #f2c23a 50%, #9c6c04 100%); }
+  .chip:hover { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 6px 14px -8px rgba(48, 36, 12, .5); }
+  .chip:hover::before { transform: rotate(360deg) translateX(1px); }
+  .chip:active { transform: translateY(0) scale(.95); box-shadow: none; }
   .chip.is-active { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .chip.is-active::before { animation: pop .4s var(--spring); }
+  @keyframes pop { 0% { transform: scale(.4); } 60% { transform: scale(1.3); } 100% { transform: none; } }
   .chip .chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 20ch; }
-  .chip .chip-key { color: var(--muted); }
+  .chip .chip-key { color: var(--muted); transition: color .18s; }
   .chip.is-active .chip-key { color: inherit; opacity: .75; }
   .chip[aria-expanded=true]:not(.is-active) { border-color: var(--ink); background: var(--sunken); }
+  /* The picked birthday has a slot of its own, so showing it does not move the other chips. */
+  #birthdayText { display: inline-block; min-width: 10ch; text-align: left; font-variant-numeric: tabular-nums; }
+  #birthdayText:empty::before { content: "pick one"; color: var(--muted); }
+  .chip.is-active #birthdayText:empty::before { color: inherit; }
   .bday {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: end; gap: var(--s-2);
     margin-top: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--sunken);
   }
-  .bday[hidden] { display: none; }
   .bday label { display: flex; flex-direction: column; gap: 4px; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
   .bday select {
     min-height: var(--tap); padding: 0 var(--s-3); font: 600 var(--t-md)/1 var(--font); color: var(--ink);
-    background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r-md); cursor: pointer;
+    background: var(--card); border: 1px solid var(--control); border-radius: var(--r-md); cursor: pointer;
   }
   .bday select:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .bday .bday-done { min-height: var(--tap); padding: 0 var(--s-4); border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); font: 600 var(--t-sm)/1 var(--font); cursor: pointer; }
+  .bday .bday-done { min-height: var(--tap); padding: 0 var(--s-4); border-radius: var(--r-pill); border: 1px solid var(--control); background: var(--card); color: var(--ink); font: 600 var(--t-sm)/1 var(--font); cursor: pointer; transition: transform .2s var(--spring); }
   .bday .bday-done:hover { border-color: var(--ink); }
+  .bday .bday-done:active { transform: scale(.94); }
 
-  /* Settings */
+  /* ---------- Settings ---------- */
   /* Settings sit open on wide screens. On a phone they fold into one summary line under the seed. */
   .settings-box { margin-top: var(--s-5); border-top: 1px solid var(--line); }
   .settings-box > summary { display: none; }
   .settings {
-    display: grid; gap: var(--s-4) var(--s-5); align-items: end;
-    grid-template-columns: max-content minmax(190px, 240px) minmax(110px, 150px) minmax(110px, 150px);
+    display: grid; gap: var(--s-4) var(--s-5); align-items: start;
+    grid-template-columns: minmax(150px, 170px) minmax(200px, 240px) minmax(110px, 140px) minmax(110px, 140px);
     justify-content: center; padding-top: var(--s-5);
   }
-  .field > label, .field > .label { display: block; font-size: var(--t-sm); font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .field { min-width: 0; }
+  .field > label, .field > .label { display: block; font-size: var(--t-sm); font-weight: 600; color: var(--muted); margin-bottom: 6px; white-space: nowrap; }
+  .field-error { margin-top: 6px; font-size: var(--t-xs); line-height: 1.35; font-weight: 600; color: var(--loss); }
   input[type=number] {
     width: 100%; min-height: var(--tap); font: 600 var(--t-md)/1 var(--font); color: var(--ink);
-    background: var(--sunken); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+    background: var(--sunken); border: 1px solid var(--control); border-radius: var(--r-md);
     padding: 0 var(--s-3); font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield; appearance: textfield;
   }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   input[type=number]:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--card); }
-  .stepper { display: flex; align-items: stretch; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--sunken); overflow: hidden; }
+  input[aria-invalid=true], .stepper:has(input[aria-invalid=true]) { border-color: var(--loss); }
+  .stepper { display: flex; align-items: stretch; border: 1px solid var(--control); border-radius: var(--r-md); background: var(--sunken); overflow: hidden; }
   .stepper:has(input:focus) { border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .stepper input { border: 0; border-radius: 0; background: transparent; text-align: center; width: 56px; min-height: 42px; padding: 0 2px; -moz-appearance: textfield; appearance: textfield; }
+  .stepper input { flex: 1; min-width: 0; border: 0; border-radius: 0; background: transparent; text-align: center; min-height: 42px; padding: 0 2px; }
   .stepper input:focus { box-shadow: none; }
-  .stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper input.bump { animation: bump .3s var(--spring); }
+  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: none; } }
   .stepper button {
     flex: none; width: var(--tap); min-height: 42px; border: 0; background: transparent; color: var(--ink);
-    font: 600 20px/1 var(--font); cursor: pointer;
+    font: 600 22px/1 var(--font); cursor: pointer; transition: background-color .15s;
   }
+  .stepper button span { display: inline-block; transition: transform .2s var(--spring); }
   .stepper button:hover { background: var(--line); }
+  .stepper button:active span { transform: scale(.7); }
   .stepper button:focus-visible { outline-offset: -3px; }
   .affix { position: relative; }
   .affix input { padding-right: 30px; }
   .affix span { position: absolute; right: var(--s-3); top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; pointer-events: none; }
 
-  .toggle { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-1); padding: var(--s-1); border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--sunken); }
+  /* Cash or annuity: a sliding thumb, and each half is a 40px target. */
+  .toggle {
+    position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 3px;
+    border: 1px solid var(--control); border-radius: var(--r-md); background: var(--sunken);
+  }
+  .toggle::before {
+    content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px);
+    border-radius: var(--r-sm); background: var(--card); box-shadow: var(--shadow-sm), 0 0 0 1px var(--line-strong);
+    transition: transform .32s var(--spring);
+  }
+  .toggle:has(#payout-annuity:checked)::before { transform: translateX(100%); }
   .toggle input { position: absolute; opacity: 0; pointer-events: none; }
   .toggle label {
-    display: grid; place-items: center; min-height: 34px; margin: 0; padding: 0 var(--s-3); border-radius: var(--r-sm);
-    font-size: var(--t-sm); font-weight: 600; color: var(--muted); cursor: pointer; transition: background-color .15s, color .15s;
+    position: relative; z-index: 1; display: grid; place-items: center; min-height: 40px; margin: 0; padding: 0 var(--s-3); border-radius: var(--r-sm);
+    font-size: var(--t-sm); font-weight: 600; color: var(--muted); cursor: pointer; transition: color .2s;
   }
   .toggle label:hover { color: var(--ink); }
-  .toggle input:checked + label { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm), 0 0 0 1px var(--line); }
+  .toggle input:checked + label { color: var(--ink); }
   .toggle input:focus-visible + label { outline: 3px solid var(--focus); outline-offset: 0; }
 
-  .status {
-    display: flex; gap: var(--s-2); align-items: baseline; justify-content: center; text-align: center; margin: var(--s-4) var(--s-1) 0;
-    font-size: var(--t-sm); color: var(--muted);
+  /* ---------- Status ---------- */
+  .status { text-align: center; margin: var(--s-4) var(--s-1) 0; font-size: var(--t-sm); color: var(--muted); }
+  /* The dot is inline, so it stays at the start of the first line however the text wraps. */
+  .status .dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--gain); vertical-align: 1px; }
+  .status.stale, .status.unknown { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); border-radius: var(--r-md); padding: var(--s-2) var(--s-3); margin-inline: 0; }
+  .status.stale .dot, .status.unknown .dot {
+    width: 18px; height: 18px; line-height: 18px; text-align: center; vertical-align: -3px;
+    background: var(--warn-ink); color: var(--warn-bg); font-weight: 800; font-size: 12px;
   }
-  .status::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gain); transform: translateY(-1px); }
-  .status.stale { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); border-radius: var(--r-md); padding: var(--s-2) var(--s-3); margin-inline: 0; }
-  .status.stale::before { content: "!"; width: 18px; height: 18px; display: grid; place-items: center; background: var(--warn-ink); color: var(--warn-bg); font-weight: 800; font-size: 12px; transform: translateY(3px); }
-  .status.none::before { background: var(--line-strong); }
+  .status.stale .dot::before, .status.unknown .dot::before { content: "!"; }
+  .status.none .dot { background: var(--line-strong); }
+  .status code { white-space: nowrap; }
+
+  /* ---------- Draw bar: whose draw this is, Copy numbers, and How it works ---------- */
+  .drawbar {
+    margin-top: var(--s-5); scroll-margin-top: var(--s-2);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--s-2) var(--s-3);
+    padding: var(--s-3) var(--s-3) var(--s-3) var(--s-5);
+    background: var(--ink); color: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow);
+  }
+  .drawbar .eyebrow { color: inherit; opacity: .7; margin: 0 0 2px; }
+  .drawbar-seed { font: 750 var(--t-lg)/1.25 var(--font-round); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drawbar-seed.empty { font-weight: 500; opacity: .75; }
+  .drawbar-seed.fresh { animation: seed-in .4s var(--spring); }
+  @keyframes seed-in { from { transform: translateY(40%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--tap); padding: 0 var(--s-5);
+    font: 650 var(--t-sm)/1 var(--font); border-radius: var(--r-pill); cursor: pointer; white-space: nowrap;
+    border: 1px solid var(--control); background: var(--card); color: var(--ink);
+    transition: background-color .15s, border-color .15s, color .15s, transform .25s var(--spring), box-shadow .15s;
+  }
+  .btn:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .btn:active { transform: scale(.95); }
+  .btn:disabled { opacity: .5; cursor: default; transform: none; }
+  .btn.copied { animation: pop .4s var(--spring); }
+  .drawbar .btn.primary {
+    background: linear-gradient(180deg, #f9d55a, #e7ad1c); color: #2a1e00; border-color: #9c6c04;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 3px 0 #9c6c04;
+  }
+  .drawbar .btn.primary:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 4px 0 #9c6c04; }
+  .drawbar .btn.primary:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 1px 0 #9c6c04; }
+  .drawbar .btn.primary:disabled { transform: none; box-shadow: none; }
+  .how-toggle {
+    display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 var(--s-3);
+    background: transparent; color: inherit; border: 0; border-radius: var(--r-pill); font: 600 var(--t-sm)/1 var(--font); cursor: pointer;
+    text-decoration: underline; text-decoration-color: rgba(127, 127, 127, .6); text-underline-offset: 3px;
+  }
+  .how-toggle:hover { text-decoration-color: currentColor; }
+  .how-toggle::after {
+    content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translate(-2px, -2px); transition: transform .25s var(--spring);
+  }
+  .how-toggle[aria-expanded=true]::after { transform: rotate(-135deg) translate(-2px, -2px); }
+  .drawbar .how-toggle:focus-visible, .drawbar .btn:focus-visible { outline-color: #f9d55a; }
+  .how {
+    grid-column: 1 / -1; margin: var(--s-1) calc(var(--s-3) - var(--s-5)) 0 calc(-1 * var(--s-2)); padding: var(--s-4);
+    background: var(--card); color: var(--ink); border-radius: var(--r-md);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-3) var(--s-4); align-items: end;
+  }
+  .how p { grid-column: 1 / -1; font-size: var(--t-sm); color: var(--muted); }
+  .how p strong { color: var(--ink); }
+  .hash-wrap { min-width: 0; }
+  .hash {
+    font: 500 var(--t-sm)/1.6 var(--font-mono); color: var(--ink);
+    background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-2) var(--s-3);
+  }
+  .hash span { display: inline-block; margin-right: .6ch; }
+  .hash span:nth-child(odd) { color: var(--muted); }
 
   /* ---------- Games ---------- */
-  .games { display: grid; grid-template-columns: 1fr; gap: var(--s-5); margin-top: var(--s-5); }
-  @media (min-width: 760px) { .games { grid-template-columns: 1fr 1fr; } }
-  .game { display: flex; flex-direction: column; gap: var(--s-4); min-width: 0; position: relative; overflow: hidden; }
-  .game::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--tone-bar); }
+  .games { display: grid; grid-template-columns: 1fr; gap: var(--s-5); margin-top: var(--s-4); }
+  @media (min-width: 960px) { .games { grid-template-columns: 1fr 1fr; } }
+  .game { display: flex; flex-direction: column; gap: var(--s-4); min-width: 0; position: relative; overflow: hidden; padding-top: calc(var(--s-5) + 4px); }
+  .game::before { content: ""; position: absolute; inset: 0 0 auto; height: 7px; background: var(--tone-bar); }
+  /* A light sweeps along the colour bar each time a new draw lands. */
+  .game::after {
+    content: ""; position: absolute; top: 0; left: 0; width: 35%; height: 7px; pointer-events: none; opacity: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent);
+  }
+  .game.drawing::after { animation: sweep 1.1s ease-out; }
+  @keyframes sweep { 0% { transform: translateX(-100%); opacity: 1; } 100% { transform: translateX(300%); opacity: 1; } }
   .game[data-game=powerball] { --tone-bar: linear-gradient(90deg, #e23a46, #a8172a); --tone-text: var(--pb-text); }
   .game[data-game=megamillions] { --tone-bar: linear-gradient(90deg, #f7cd4a, #d39a0c); --tone-text: var(--mm-text); }
   .game-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-3); flex-wrap: wrap; }
   .game-title { display: flex; align-items: center; gap: var(--s-3); }
-  .game-title .ball { --size: 28px; animation: none; }
-  .game h2 { font-size: var(--t-xl); font-weight: 800; letter-spacing: -0.02em; }
+  .game-title .ball { --size: 34px; animation: none; }
+  .game h2 { font-size: var(--t-xl); font-weight: 850; letter-spacing: -0.02em; }
   .jackpot { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-  .jackpot-amt { font: 800 var(--t-lg)/1.2 var(--font-round); font-variant-numeric: tabular-nums; }
+  .jackpot-amt { font: 850 var(--t-lg)/1.2 var(--font-round); font-variant-numeric: tabular-nums; color: var(--tone-text); }
   .jackpot-sub { font-size: var(--t-xs); color: var(--muted); }
+  .jackpot-sub .past { color: var(--warn-ink); background: var(--warn-bg); border-radius: 4px; padding: 0 4px; font-weight: 700; }
   /* A narrow column puts the jackpot on its own line under the name rather than wrapping it ragged. */
   .game { container: game / inline-size; }
   @container game (max-width: 460px) {
@@ -223,72 +354,108 @@
     .jackpot-amt { font-size: var(--t-md); }
   }
 
-  /* Tickets. Ball size follows the column's width (container query units), so five balls and the bonus
-     ball always share one line, from a 375px phone up to a wide desktop column. */
-  .tickets { display: flex; flex-direction: column; gap: var(--s-2); container-type: inline-size; }
+  /* Tickets. Each ticket is a tray the balls drop into. Ball size and gaps follow the column's width
+     (container query units), so five balls and the bonus ball always share one line, from a 320px phone
+     to a wide desktop column. */
+  .tickets { display: flex; flex-direction: column; gap: var(--s-2); container-type: inline-size; --size: clamp(26px, calc((100cqi - 40px) / 6.9), 60px); }
+  .tickets.multi { --size: clamp(24px, calc((100cqi - 74px) / 6.9), 56px); }
   .ticket {
-    display: flex; align-items: center; justify-content: center; gap: var(--s-2);
-    padding: 10px var(--s-3); border-radius: var(--r-md);
-    background: var(--sunken); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; gap: calc(var(--size) * .16);
+    padding: calc(var(--size) * .2) 10px calc(var(--size) * .26); border-radius: calc(var(--size) * .5 + 10px);
+    background: var(--tray); border: 1px solid var(--line);
+    box-shadow: inset 0 2px 5px rgba(48, 36, 12, .14), inset 0 -1px 0 rgba(255, 255, 255, .5);
   }
   .ticket .n {
     flex: none; width: 24px; text-align: right; color: var(--muted);
-    font: 600 var(--t-xs)/1 var(--font); font-variant-numeric: tabular-nums;
+    font: 700 var(--t-xs)/1 var(--font); font-variant-numeric: tabular-nums;
   }
   .tickets:not(.multi) .ticket .n { display: none; }
-  .ticket .balls { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
-  .pool { display: flex; gap: 6px; }
-  .plus { flex: none; width: 10px; text-align: center; color: var(--muted); font-weight: 700; }
+  .ticket .balls { display: flex; align-items: center; gap: calc(var(--size) * .16); min-width: 0; }
+  .pool { display: flex; gap: calc(var(--size) * .12); }
+  .plus { flex: none; width: 12px; text-align: center; color: var(--muted); font-weight: 800; }
+
+  .slot { position: relative; flex: none; width: var(--size); height: var(--size); }
+  /* The shadow on the tray floor: it grows as the ball lands and squashes with it. */
+  .slot::before {
+    content: ""; position: absolute; left: 10%; right: 10%; bottom: -9%; height: 18%; border-radius: 50%;
+    background: radial-gradient(closest-side, var(--ground), transparent);
+    animation: ground .52s linear both; animation-delay: var(--d, 0ms);
+  }
+  /* The bonus ball lands with a ring. */
+  .slot.bonus::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--ring); opacity: 0; pointer-events: none;
+    animation: ring .38s ease-out both; animation-delay: calc(var(--d, 0ms) + 250ms);
+  }
+  .slot.bonus.red { --ring: #e23a46; }
+  .slot.bonus.gold { --ring: #e7ad1c; }
 
   .ball {
     --size: 34px;
-    --size: clamp(24px, calc((100cqi - 114px) / 6), 46px);
     position: relative; flex: none; width: var(--size); height: var(--size); border-radius: 50%;
-    display: grid; place-items: center;
-    font: 800 calc(var(--size) * .42)/1 var(--font-round); font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+    display: grid; place-items: center; transform-origin: 50% 100%;
+    font: 850 calc(var(--size) * .44)/1 var(--font-round); font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
     color: #1d1a15;
-    background: radial-gradient(circle at 34% 28%, #ffffff 0 14%, #f6f3ec 38%, #ddd7ca 72%, #b7af9f 100%);
+    background: radial-gradient(circle at 34% 28%, #ffffff 0 13%, #f8f5ee 34%, #e2dbcd 64%, #b9b09e 88%, #9d937f 100%);
     box-shadow:
-      inset -2px -3px 6px rgba(60, 45, 20, .22),
-      inset 1px 2px 3px rgba(255, 255, 255, .9),
-      0 1px 1px rgba(0, 0, 0, .12),
-      0 5px 9px -5px rgba(0, 0, 0, .45);
-    animation: drop .6s cubic-bezier(.25, 1.5, .5, 1) both;
-    animation-delay: var(--d, 0ms);
+      inset calc(var(--size) * -.06) calc(var(--size) * -.09) calc(var(--size) * .16) rgba(60, 45, 20, .26),
+      inset calc(var(--size) * .03) calc(var(--size) * .05) calc(var(--size) * .08) rgba(255, 255, 255, .95),
+      inset 0 calc(var(--size) * -.03) calc(var(--size) * .04) rgba(255, 255, 255, .35),
+      0 1px 1px rgba(0, 0, 0, .12);
   }
+  .tickets .ball { --size: inherit; }
+  .slot .ball { animation: drop .52s both; animation-delay: var(--d, 0ms); }
   /* The specular highlight stays put while the number rolls under it. */
   .ball::after {
-    content: ""; position: absolute; left: 17%; top: 9%; width: 38%; height: 24%; border-radius: 50%;
+    content: ""; position: absolute; left: 16%; top: 8%; width: 40%; height: 25%; border-radius: 50%;
     background: radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 72%);
     transform: rotate(-24deg); pointer-events: none;
   }
-  .ball .num { position: relative; z-index: 1; display: block; animation: roll .6s cubic-bezier(.2, .8, .3, 1) both; animation-delay: var(--d, 0ms); }
+  .ball .num { position: relative; z-index: 1; display: block; }
+  .slot .num { animation: roll .52s cubic-bezier(.2, .8, .3, 1) both; animation-delay: var(--d, 0ms); }
+  /* Deep enough under the digits for white text to clear 4.5:1. */
   .ball.red {
-    color: #fff; text-shadow: 0 1px 1px rgba(80, 0, 10, .55);
-    background: radial-gradient(circle at 34% 28%, #ff9d93 0 8%, #e8404c 32%, #c41f31 66%, #7c0c19 100%);
-    box-shadow: inset -2px -3px 7px rgba(60, 0, 8, .45), inset 1px 2px 3px rgba(255, 200, 200, .5), 0 1px 1px rgba(0, 0, 0, .15), 0 5px 9px -5px rgba(120, 0, 15, .6);
+    color: #fff; text-shadow: 0 1px 1px rgba(80, 0, 10, .6);
+    background: radial-gradient(circle at 34% 28%, #ff9d93 0 4%, #cf2637 14%, #b81a2b 48%, #7c0c19 100%);
+    box-shadow:
+      inset calc(var(--size) * -.06) calc(var(--size) * -.09) calc(var(--size) * .16) rgba(60, 0, 8, .45),
+      inset calc(var(--size) * .03) calc(var(--size) * .05) calc(var(--size) * .08) rgba(255, 200, 200, .5),
+      0 1px 1px rgba(0, 0, 0, .15);
   }
   .ball.gold {
     color: #2a1e00;
     background: radial-gradient(circle at 34% 28%, #fff6cc 0 9%, #f9d55a 34%, #e7ad1c 68%, #9c6c04 100%);
-    box-shadow: inset -2px -3px 7px rgba(90, 55, 0, .4), inset 1px 2px 3px rgba(255, 245, 210, .7), 0 1px 1px rgba(0, 0, 0, .15), 0 5px 9px -5px rgba(110, 70, 0, .6);
+    box-shadow:
+      inset calc(var(--size) * -.06) calc(var(--size) * -.09) calc(var(--size) * .16) rgba(90, 55, 0, .4),
+      inset calc(var(--size) * .03) calc(var(--size) * .05) calc(var(--size) * .08) rgba(255, 245, 210, .7),
+      0 1px 1px rgba(0, 0, 0, .15);
   }
   .ball.ghost {
     background: transparent; box-shadow: none; border: 2px dashed var(--line-strong); color: var(--muted);
     animation: none; font-weight: 600;
   }
   .ball.ghost::after { display: none; }
-  .ticket.settled .ball, .ticket.settled .num { animation: none; }
+  .ticket.settled .slot::before, .ticket.settled .slot::after, .ticket.settled .ball, .ticket.settled .num { animation: none; }
+
+  /* The drop: falls in, squashes on the tray, bounces twice and settles. 520 ms per ball, 90 ms apart,
+     so a whole draw lands in about 1.3 s. */
   @keyframes drop {
-    0% { transform: translateY(-70%) scale(.5); opacity: 0; }
-    35% { opacity: 1; }
+    0% { transform: translateY(-120%) rotate(-50deg); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+    14% { opacity: 1; }
+    46% { transform: translateY(0) scale(1.13, .84); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+    63% { transform: translateY(-20%) scale(.96, 1.05); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+    78% { transform: translateY(0) scale(1.05, .94); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+    89% { transform: translateY(-5%) scale(1); animation-timing-function: ease-in; }
     100% { transform: none; opacity: 1; }
   }
-  @keyframes roll { from { transform: rotate(-300deg) scale(.7); } to { transform: none; } }
-  @media (prefers-reduced-motion: reduce) {
-    .ball, .ball .num { animation: none !important; }
-    * { transition: none !important; }
+  @keyframes ground {
+    0% { transform: scale(.2); opacity: 0; }
+    46% { transform: scale(1.18, 1); opacity: 1; }
+    63% { transform: scale(.8); opacity: .65; }
+    78% { transform: scale(1.06, 1); opacity: 1; }
+    100% { transform: none; opacity: 1; }
   }
+  @keyframes roll { from { transform: rotate(-260deg) scale(.6); } to { transform: none; } }
+  @keyframes ring { 0% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1.65); opacity: 0; } }
   .empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-2); }
   .empty { color: var(--muted); font-size: var(--t-sm); }
 
@@ -299,7 +466,7 @@
 
   /* ROI */
   .roi { display: flex; flex-direction: column; gap: var(--s-4); padding-top: var(--s-4); border-top: 1px dashed var(--line-strong); }
-  .roi > .eyebrow { text-align: center; }
+  .roi > .eyebrow { text-align: center; margin: 0; }
   .roi-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s-3); }
   /* Subgrid lines the tiles' rows up, so a play name that wraps does not knock its figures out of line. */
   .roi-tile {
@@ -307,7 +474,7 @@
     display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 6px; align-content: start; text-align: center;
   }
   .roi-play { font-size: var(--t-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-  .roi-big { font: 800 40px/1 var(--font-round); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .roi-big { font: 850 40px/1 var(--font-round); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .roi-tile.loss .roi-big { color: var(--loss); }
   .roi-tile.gain .roi-big { color: var(--gain); }
   .roi-back { font-size: var(--t-sm); color: var(--muted); line-height: 1.35; }
@@ -319,11 +486,13 @@
     box-shadow: inset 0 0 0 1px var(--line-strong);
   }
   .meter > span { display: block; height: 100%; background: var(--ink); border-radius: var(--r-pill) 0 0 var(--r-pill); }
+  .waiting { text-align: center; }
 
   .rows { display: grid; gap: 6px var(--s-4); font-size: var(--t-sm); align-items: baseline; }
   .rows .k { color: var(--muted); }
   .rows .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
-  .rows .h { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--muted); white-space: normal; max-width: 10ch; margin-left: auto; line-height: 1.25; }
+  .rows .hd { align-self: end; white-space: normal; }
+  .rows .h { display: block; font-size: var(--t-xs); font-weight: 700; color: var(--muted); max-width: 10ch; margin-left: auto; text-align: right; line-height: 1.25; }
   .rows .sub { padding-left: var(--s-3); font-size: var(--t-xs); }
   .rows .v.sub { padding-left: 0; font-weight: 500; color: var(--muted); }
   .rows .rule { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 2px 0; }
@@ -336,40 +505,25 @@
   }
   details.assume > summary::-webkit-details-marker { display: none; }
   details.assume > summary .muted { color: var(--muted); font-weight: 500; }
+  details.assume > summary .edited { margin-left: var(--s-2); padding: 1px 6px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); font-size: var(--t-xs); font-weight: 700; }
   details.assume > summary::after {
     content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
-    transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s;
+    transform: rotate(45deg) translate(-2px, -2px); transition: transform .25s var(--spring);
   }
   details.assume[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
-  .assume-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); padding: 0 var(--s-4) var(--s-4); }
-  .assume-grid label { display: block; font-size: var(--t-xs); font-weight: 600; color: var(--muted); margin-bottom: var(--s-1); }
+  /* Labels may wrap to two lines; the inputs still share one baseline because each cell ends with its input. */
+  .assume-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); padding: 0 var(--s-4) var(--s-3); align-items: end; }
+  .assume-grid label { display: block; font-size: var(--t-xs); font-weight: 600; color: var(--muted); margin-bottom: var(--s-1); line-height: 1.3; }
   .assume-grid input { background: var(--card); }
+  .assume-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-3); padding: 0 var(--s-4) var(--s-4); }
+  .assume-foot .field-error { margin: 0; }
+  .assume-foot .btn { min-height: 40px; padding: 0 var(--s-4); margin-left: auto; }
   .note { font-size: var(--t-xs); color: var(--muted); }
-
-  /* ---------- Seed check ---------- */
-  .seed { margin-top: var(--s-5); display: grid; grid-template-columns: 1fr auto; gap: var(--s-3) var(--s-5); align-items: center; }
-  .seed h2 { font-size: var(--t-lg); font-weight: 800; grid-column: 1 / -1; }
-  .seed-main { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
-  .hash {
-    font: 500 var(--t-sm)/1.6 var(--font-mono); color: var(--ink);
-    background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-2) var(--s-3);
-  }
-  .hash span { display: inline-block; margin-right: .6ch; }
-  .hash span:nth-child(odd) { color: var(--muted); }
-  .actions { display: flex; flex-direction: column; gap: var(--s-2); }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); padding: 0 var(--s-5);
-    font: 600 var(--t-sm)/1 var(--font); border-radius: var(--r-pill); cursor: pointer; white-space: nowrap;
-    border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); transition: background-color .15s, border-color .15s;
-  }
-  .btn:hover { border-color: var(--ink); }
-  .btn.primary { background: var(--ink); color: var(--card); border-color: var(--ink); }
-  .btn.primary:hover { opacity: .9; }
 
   /* ---------- Fine print ---------- */
   .fineprint { margin-top: var(--s-6); padding: 0 var(--s-1); color: var(--muted); font-size: var(--t-sm); }
   .fineprint h2 { font-size: var(--t-md); color: var(--ink); margin-bottom: var(--s-3); }
-  .fineprint ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--s-3) var(--s-6); }
+  .fineprint ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--s-3) var(--s-6); }
   .fineprint li { padding-left: var(--s-4); position: relative; }
   .fineprint li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
   .fineprint strong { color: var(--ink); font-weight: 650; }
@@ -377,14 +531,15 @@
   /* ---------- Narrow screens ---------- */
   @media (max-width: 759px) {
     .settings { grid-template-columns: 1fr 1fr; }
-    .stepper input { width: 100%; }
   }
   @media (max-width: 560px) {
-    main { padding-top: var(--s-5); }
-    .card { padding: var(--s-4); border-radius: var(--r-md); }
+    main { padding: var(--s-5) var(--s-3) var(--s-7); }
+    .card { padding: var(--s-4) 14px; border-radius: var(--r-md); }
+    .game { padding-top: calc(var(--s-4) + 6px); }
+    .masthead { margin-bottom: var(--s-4); gap: var(--s-2); }
     .tagline { font-size: var(--t-md); }
-    textarea#seed { font-size: 20px; min-height: 56px; padding: 12px 48px; }
-    .clear { top: 6px; right: 6px; }
+    textarea#seed { font-size: 21px; min-height: 58px; padding: 12px 46px; }
+    .clear { top: 7px; right: 4px; }
     .settings { gap: var(--s-3); padding-top: var(--s-2); }
     .settings-box { margin-top: var(--s-3); }
     .settings-box > summary {
@@ -394,22 +549,52 @@
     .settings-box > summary::-webkit-details-marker { display: none; }
     .settings-box > summary::after {
       content: ""; flex: none; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
-      transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s;
+      transform: rotate(45deg) translate(-2px, -2px); transition: transform .25s var(--spring);
     }
     .settings-box[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
     .settings-summary { color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .settings-box[open] .settings-summary { visibility: hidden; }
-    .chips-label { flex-basis: 100%; text-align: center; margin: 0; }
+    /* Chips scroll sideways in one row instead of stacking four rows deep above the draw. */
+    .chips {
+      flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none;
+      margin-inline: -14px; padding: 4px 14px 6px; scroll-padding-inline: 14px;
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 22px), transparent);
+      mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 22px), transparent);
+    }
+    .chips::-webkit-scrollbar { display: none; }
+    .chips-label { flex: none; margin: 0; }
+    .chip:hover { transform: none; box-shadow: none; }
     .game h2 { font-size: var(--t-lg); }
-    .ticket { padding: 8px 10px; }
+    .ticket { padding-inline: 8px; }
     .roi-big { font-size: 32px; }
     .roi-tile { padding: var(--s-3); }
     .assume-grid { grid-template-columns: 1fr 1fr; padding: 0 var(--s-3) var(--s-3); }
     .assume-grid > :last-child { grid-column: 1 / -1; }
+    .assume-foot { padding: 0 var(--s-3) var(--s-3); }
     details.assume > summary { padding: 0 var(--s-3); }
-    .seed { grid-template-columns: 1fr; }
-    .actions { flex-direction: row; }
-    .actions .btn { flex: 1; padding: 0 var(--s-3); }
+    .drawbar { grid-template-columns: minmax(0, 1fr) auto; padding: var(--s-3); border-radius: var(--r-md); }
+    .drawbar-main { grid-column: 1 / -1; text-align: center; }
+    .drawbar .btn.primary { order: 2; justify-self: stretch; }
+    .drawbar .how-toggle { order: 3; }
+    .drawbar .how { order: 4; margin: 0; }
+    .how { grid-template-columns: 1fr; padding: var(--s-3); }
+    .how .btn { justify-self: start; }
+  }
+  @media (max-width: 480px) {
+    /* The logo sits above the title rather than squeezing it. */
+    .brand { flex-direction: column; gap: var(--s-2); }
+    h1 { text-align: center; }
+    .h1-top { margin-left: 0; }
+    .logo .ball { --size: 38px; }
+    .logo .ball:nth-child(2) { --size: 44px; }
+  }
+  @media (max-width: 420px) {
+    .settings > .field:nth-child(-n+2) { grid-column: 1 / -1; }
+    .stepper { max-width: 220px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
   }
 </style>
 </head>
@@ -418,7 +603,7 @@
   <header class="masthead">
     <div class="brand">
       <span class="logo" aria-hidden="true"><span class="ball"></span><span class="ball red"></span><span class="ball gold"></span></span>
-      <h1>Nathan's Seeded Lottery</h1>
+      <h1><span class="h1-top">Nathan's</span> <span class="h1-main">Seeded Lottery</span></h1>
     </div>
     <p class="tagline">Type anything. <strong>The same text always draws the same numbers.</strong></p>
   </header>
@@ -426,7 +611,7 @@
   <section class="card hero" aria-label="Seed and settings">
     <label class="hero-label" for="seed">Your seed text</label>
     <div class="seed-box">
-      <textarea id="seed" rows="1" placeholder="A date, a name, a sentence…" autocomplete="off" spellcheck="false" autofocus></textarea>
+      <textarea id="seed" rows="1" placeholder="A date, a name, a sentence…" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-describedby="seedHint" autofocus></textarea>
       <button type="button" class="clear" id="clearSeed" aria-label="Clear seed text" hidden>×</button>
     </div>
     <div class="chips" role="group" aria-label="Fill in an example">
@@ -442,7 +627,7 @@
       <label>Year<select id="bdayYear"></select></label>
       <button type="button" class="bday-done" id="bdayDone">Done</button>
     </div>
-    <p class="hint">Exact text: spaces and capitals count, and so does how you write a date. The chips write dates like 10/9/2026.</p>
+    <p class="hint" id="seedHint">Exact text: spaces and capitals count, and so does how you write a date. The chips write dates like 10/9/2026.</p>
 
     <details class="settings-box" id="settingsBox">
     <summary><span>Settings</span><span class="settings-summary" id="settingsSummary"></span></summary>
@@ -450,10 +635,11 @@
       <div class="field">
         <label for="count">Tickets</label>
         <div class="stepper">
-          <button type="button" id="countDown" aria-label="One ticket fewer">−</button>
-          <input id="count" type="number" min="1" max="100" value="1" inputmode="numeric">
-          <button type="button" id="countUp" aria-label="One ticket more">+</button>
+          <button type="button" id="countDown" aria-label="One ticket fewer"><span aria-hidden="true">−</span></button>
+          <input id="count" type="number" min="1" max="100" step="1" value="1" inputmode="numeric" aria-describedby="countError">
+          <button type="button" id="countUp" aria-label="One ticket more"><span aria-hidden="true">+</span></button>
         </div>
+        <p class="field-error" id="countError" hidden></p>
       </div>
       <div class="field">
         <span class="label" id="payoutLabel">Take the jackpot as</span>
@@ -464,11 +650,13 @@
       </div>
       <div class="field">
         <label for="fedTax">Federal tax</label>
-        <div class="affix"><input id="fedTax" type="number" min="0" max="99" step="0.1" value="37" placeholder="0" inputmode="decimal"><span aria-hidden="true">%</span></div>
+        <div class="affix"><input id="fedTax" type="number" min="0" max="99" step="0.1" value="37" placeholder="0" inputmode="decimal" aria-describedby="fedTaxError"><span aria-hidden="true">%</span></div>
+        <p class="field-error" id="fedTaxError" hidden></p>
       </div>
       <div class="field">
         <label for="stateTax">State tax</label>
-        <div class="affix"><input id="stateTax" type="number" min="0" max="99" step="0.1" value="0" placeholder="0" inputmode="decimal"><span aria-hidden="true">%</span></div>
+        <div class="affix"><input id="stateTax" type="number" min="0" max="99" step="0.1" value="0" placeholder="0" inputmode="decimal" aria-describedby="stateTaxError"><span aria-hidden="true">%</span></div>
+        <p class="field-error" id="stateTaxError" hidden></p>
       </div>
     </div>
     </details>
@@ -476,8 +664,25 @@
 
   <p class="status" id="dataNote"></p>
 
+  <section class="drawbar" id="drawBar" aria-label="Your draw">
+    <div class="drawbar-main">
+      <span class="eyebrow">Your draw</span>
+      <p class="drawbar-seed" id="drawSeed"></p>
+    </div>
+    <button type="button" class="how-toggle" id="howToggle" aria-expanded="false" aria-controls="how">How it works</button>
+    <button type="button" class="btn primary" id="copyNumbers">Copy numbers</button>
+    <div class="how" id="how" hidden>
+      <p>Your text, character for character (as UTF-8, after Unicode normalization), is run through <strong>SHA-256</strong>. That hash seeds a <strong>xoshiro256**</strong>
+        generator, which draws each ticket's numbers without bias. Same text, same hash, same numbers, on any device.</p>
+      <div class="hash-wrap">
+        <span class="eyebrow" id="hashLabel">SHA-256 seed</span>
+        <div class="hash" id="hash" aria-labelledby="hashLabel"></div>
+      </div>
+      <button type="button" class="btn" id="copyHash">Copy hash</button>
+    </div>
+  </section>
+
   <div class="games" id="games"></div>
-  <div id="seedOut"></div>
 
   <footer class="fineprint">
     <h2>How to read these numbers</h2>
@@ -504,8 +709,8 @@
 <script src="jackpots.js"></script>
 <script>
   'use strict';
-  const { GAMES, jackpotOdds, generate } = window.SeededLottery;
-  const { expectedReturn, PAYOUTS } = window.LotteryRoi;
+  const { GAMES, jackpotOdds, generate, usDate } = window.SeededLottery;
+  const { expectedReturn } = window.LotteryRoi;
   const DATA = window.JACKPOTS || null;
   const GAME_IDS = ['powerball', 'megamillions'];
   // The ways to play each game, priced side by side.
@@ -513,10 +718,22 @@
   const PLAY_NAMES = { powerball: '$2 play', powerballPowerPlay: '$3 with Power Play', megamillions: '$5 play' };
   // The bonus ball's finish. The colour is decoration: the "+" before it, its position and the legend name it too.
   const BONUS_FINISH = { powerball: 'red', megamillions: 'gold' };
+  const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const ASSUME_FIELDS = [['annuity', 'Jackpot'], ['cash', 'Cash value'], ['sold', 'Projected plays']];
   const $ = (id) => document.getElementById(id);
   // Opened from disk or a local server, the reader can run the fetch; on the hosted site a daily job does.
   const LOCAL = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   const REFRESH_HINT = LOCAL ? ' Run <code>node fetch-jackpots.js</code> to refresh.' : ' They refresh every morning.';
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const coarsePointer = window.matchMedia('(pointer: coarse)');
+
+  // The ticket count the draw uses. An empty or invalid Tickets field keeps the last good count, so the
+  // draw on screen stays put while someone retypes the number.
+  let drawCount = 1;
+  // The seed of the draw on screen, so the light sweep plays only for a new seed.
+  let shownSeed = null;
+  // Today's figures per game as the assumption fields first showed them, for "Back to today's figures".
+  const fetched = {};
 
   // One column per game. Built once; render() fills in what changes.
   for (const id of GAME_IDS) {
@@ -537,20 +754,30 @@
         <div class="legend">${g.pools.map((p, i) => `<span><span class="ball${i ? ` ${BONUS_FINISH[id]}` : ''}" aria-hidden="true"></span>${escapeHtml(p.label)}: ${p.count} of 1 to ${p.max}</span>`).join('')}
           <span>Jackpot: 1 in ${jackpotOdds(g).toLocaleString('en-US')}</span></div>
         <div class="roi">
-          <span class="eyebrow" style="margin:0">ROI per ticket, after tax</span>
+          <span class="eyebrow">ROI per ticket, after tax</span>
           <div id="${id}-roi"></div>
           <details class="assume" id="${id}-assume">
-            <summary><span>Assumptions <span class="muted">· jackpot, cash, plays</span></span></summary>
+            <summary><span>Assumptions <span class="muted">· jackpot, cash, plays</span><span class="edited" id="${id}-edited" hidden>edited</span></span></summary>
             <div class="assume-grid">
-              <div><label for="${id}-annuity">Jackpot ($M)</label><input id="${id}-annuity" type="number" min="0" step="1" inputmode="decimal"></div>
-              <div><label for="${id}-cash">Cash value ($M)</label><input id="${id}-cash" type="number" min="0" step="0.1" inputmode="decimal"></div>
-              <div><label for="${id}-sold">Projected plays (M)</label><input id="${id}-sold" type="number" min="0" step="0.1" inputmode="decimal"></div>
+              <div><label for="${id}-annuity">Jackpot ($M)</label><input id="${id}-annuity" type="number" min="0" step="1" inputmode="decimal" aria-describedby="${id}-assumeError"></div>
+              <div><label for="${id}-cash">Cash value ($M)</label><input id="${id}-cash" type="number" min="0" step="0.1" inputmode="decimal" aria-describedby="${id}-assumeError"></div>
+              <div><label for="${id}-sold">Projected plays (M)</label><input id="${id}-sold" type="number" min="0" step="0.1" inputmode="decimal" aria-describedby="${id}-assumeError"></div>
+            </div>
+            <div class="assume-foot">
+              <p class="field-error" id="${id}-assumeError" hidden></p>
+              <button type="button" class="btn" id="${id}-reset" hidden disabled>Back to today's figures</button>
             </div>
           </details>
           <p class="note" id="${id}-note"></p>
         </div>
       </section>`);
     prefill(id);
+    $(`${id}-reset`).addEventListener('click', () => {
+      for (const [field] of ASSUME_FIELDS) $(`${id}-${field}`).value = fetched[id][field];
+      render();
+      // The button disables itself; keep focus in the panel rather than dropping it to the page.
+      $(`${id}-annuity`).focus();
+    });
   }
 
   function prefill(id) {
@@ -565,51 +792,147 @@
       $(`${id}-assume`).open = true;
       return;
     }
-    $(`${id}-annuity`).value = (g.next.annuity / 1e6).toFixed(1);
-    $(`${id}-cash`).value = (g.next.cash / 1e6).toFixed(1);
-    if (g.estimatedTicketsSold != null) $(`${id}-sold`).value = (g.estimatedTicketsSold / 1e6).toFixed(2);
+    fetched[id] = {
+      annuity: (g.next.annuity / 1e6).toFixed(1),
+      cash: (g.next.cash / 1e6).toFixed(1),
+      sold: g.estimatedTicketsSold == null ? '' : (g.estimatedTicketsSold / 1e6).toFixed(2),
+    };
+    for (const [field] of ASSUME_FIELDS) $(`${id}-${field}`).value = fetched[id][field];
+    $(`${id}-reset`).hidden = false;
     const drift = g.prizeTableDrift && g.prizeTableDrift.length
       ? ` <span class="error">The site's prize table no longer matches this one; the ROI may be wrong.</span>` : '';
     // A failed refresh keeps the last good figures; say how old they are rather than passing them off as current.
     const kept = g.lastError
-      ? ` <span class="error">The latest refresh failed (${escapeHtml(g.lastError)}); these figures are from ${escapeHtml(new Date(g.fetchedAt).toLocaleDateString())}.</span>` : '';
+      ? ` <span class="error">The latest refresh failed (${escapeHtml(g.lastError)}); these figures are from ${escapeHtml(formatDay(new Date(g.fetchedAt)))}.</span>` : '';
     $(`${id}-note`).innerHTML =
       `Last draw ${escapeHtml(formatDate(g.lastDrawDate))}: jackpot $${round(g.last.annuity / 1e6, 1)}M, cash $${round(g.last.cash / 1e6, 1)}M.` +
       (g.estimatedTicketsSold == null ? ' Ticket sales could not be estimated (the jackpot may have just reset).' : '') + kept + drift;
   }
 
-  // The age that matters is the oldest game's figures, not the run that wrote the file: a run whose fetch
-  // failed still writes it, keeping the old figures with their own date.
-  const figureDates = DATA && DATA.games
-    ? Object.values(DATA.games).filter((g) => g && !g.error && g.next).map((g) => new Date(g.fetchedAt || DATA.fetchedAt))
-    : [];
-  if (figureDates.length) {
-    const fetched = new Date(Math.min(...figureDates));
-    const ageDays = (Date.now() - fetched) / 864e5;
-    // Both games draw at least twice a week, so figures three days old have probably missed a draw.
-    $('dataNote').classList.toggle('stale', ageDays > 3);
-    $('dataNote').innerHTML = `<span>Jackpots as of ${escapeHtml(fetched.toLocaleString())}.` +
-      (ageDays > 3 ? ` <strong>Likely out of date.</strong>${LOCAL ? REFRESH_HINT : ' The daily refresh has not succeeded since then.'}</span>` : `${REFRESH_HINT}</span>`);
-  } else if (LOCAL) {
-    $('dataNote').classList.add('none');
-    $('dataNote').innerHTML = '<span>No jackpot data loaded. Run <code>node fetch-jackpots.js</code> beside this page, then reload.</span>';
-  } else {
-    $('dataNote').classList.add('none');
-    $('dataNote').innerHTML = '<span>No jackpot data loaded. Type the figures into each game\u2019s assumptions.</span>';
+  // ---------- How fresh the figures are ----------
+
+  // The games with figures to show, as [id, game] pairs.
+  function gamesWithFigures() {
+    return DATA && DATA.games ? GAME_IDS.map((id) => [id, DATA.games[id]]).filter(([, g]) => g && !g.error && g.next) : [];
   }
+
+  /**
+   * When the next draw happens, in ms since the epoch, or null when it cannot be read. `nextDrawAt` (ISO) is
+   * exact. A bare `nextDrawDate` is taken as 11 pm Eastern that day, when both games draw.
+   */
+  function drawTime(g) {
+    if (g.nextDrawAt != null) {
+      const t = Date.parse(g.nextDrawAt);
+      return Number.isFinite(t) ? t : null;
+    }
+    const d = parseDrawDate(g.nextDrawDate);
+    return d ? easternInstant(d.y, d.m, d.d, 23, 0) : null;
+  }
+
+  function drawLabel(g) {
+    if (g.nextDrawAt != null && Number.isFinite(Date.parse(g.nextDrawAt))) return formatDay(new Date(g.nextDrawAt), true);
+    return formatDate(g.nextDrawDate);
+  }
+
+  function updateStatus() {
+    const note = $('dataNote');
+    const games = gamesWithFigures();
+    note.className = 'status';
+    if (!games.length) {
+      note.classList.add('none');
+      note.innerHTML = '<span class="dot" aria-hidden="true"></span>' + (LOCAL
+        ? 'No jackpot data loaded. Run <code>node fetch-jackpots.js</code> beside this page, then reload.'
+        : 'No jackpot data loaded. Type the figures into each game’s assumptions.');
+      return;
+    }
+    // The age that matters is the oldest game's figures, not the run that wrote the file: a run whose fetch
+    // failed still writes it, keeping the old figures with their own date.
+    const fetchedAt = new Date(Math.min(...games.map(([, g]) => new Date(g.fetchedAt || DATA.fetchedAt))));
+    const ageDays = (Date.now() - fetchedAt) / 864e5;
+    const asOf = `Jackpots as of ${escapeHtml(formatStamp(fetchedAt))}.`;
+    const now = Date.now();
+    const drawn = games.filter(([, g]) => { const t = drawTime(g); return t != null && t <= now; });
+    const unknown = games.filter(([, g]) => drawTime(g) == null);
+    const stillHint = LOCAL ? REFRESH_HINT : ' The daily refresh has not caught up yet.';
+    let cls = '';
+    let msg;
+    if (drawn.length) {
+      cls = 'stale';
+      const said = drawn.length === 1
+        ? `${GAMES[drawn[0][0]].name} drew on ${escapeHtml(drawLabel(drawn[0][1]))}, and these figures are from before that draw.`
+        : `${GAMES[drawn[0][0]].name} drew on ${escapeHtml(drawLabel(drawn[0][1]))} and ${GAMES[drawn[1][0]].name} on ${escapeHtml(drawLabel(drawn[1][1]))}, and these figures are from before those draws.`;
+      msg = `${asOf} <strong>Out of date.</strong> ${said}${stillHint}`;
+    } else if (ageDays > 3) {
+      // Both games draw at least twice a week, so figures three days old have probably missed a draw.
+      cls = 'stale';
+      msg = `${asOf} <strong>Likely out of date.</strong>${LOCAL ? REFRESH_HINT : ' The daily refresh has not succeeded since then.'}`;
+    } else if (unknown.length) {
+      cls = 'unknown';
+      msg = `${asOf} The next ${unknown.map(([id]) => GAMES[id].name).join(' and ')} draw date could not be read, so these figures may be out of date.`;
+    } else {
+      msg = asOf + REFRESH_HINT;
+    }
+    if (cls) note.classList.add(cls);
+    note.innerHTML = `<span class="dot" aria-hidden="true"></span>${msg}`;
+  }
+
+  // ---------- Reading the fields ----------
+
+  // Ticket count: a whole number from 1 to 100. An empty field is not an error yet, just unfinished.
+  function readCount() {
+    const el = $('count');
+    if (el.validity.badInput) return { error: 'Enter a whole number from 1 to 100.' };
+    if (el.value === '') return {};
+    const n = Number(el.value);
+    if (!Number.isInteger(n)) return { error: 'Tickets come in whole numbers, 1 to 100.' };
+    if (n < 1) return { error: 'You need at least 1 ticket.' };
+    if (n > 100) return { error: 'Up to 100 tickets at a time.' };
+    return { value: n };
+  }
+
+  // Tax: each rate from 0 to 99%, together under 100%. An empty field counts as 0%, as its placeholder shows.
+  function readTax() {
+    const one = (id, name) => {
+      const el = $(id);
+      if (el.validity.badInput) return { error: `Enter ${name} tax as a number, like 37.` };
+      const n = el.value === '' ? 0 : Number(el.value);
+      if (!(n >= 0 && n <= 99)) return { error: `${name[0].toUpperCase() + name.slice(1)} tax must be from 0 to 99%.` };
+      return { value: n };
+    };
+    const fed = one('fedTax', 'federal');
+    const state = one('stateTax', 'state');
+    if (!fed.error && !state.error && fed.value + state.value >= 100) state.error = 'Federal and state tax together must be under 100%.';
+    showFieldError('fedTax', fed.error);
+    showFieldError('stateTax', state.error);
+    return fed.error || state.error ? null : (fed.value + state.value) / 100;
+  }
+
+  function showFieldError(id, message) {
+    const err = $(`${id}Error`);
+    err.hidden = !message;
+    err.textContent = message || '';
+    if (message) $(id).setAttribute('aria-invalid', 'true');
+    else $(id).removeAttribute('aria-invalid');
+  }
+
+  // ---------- Drawing ----------
 
   function render() {
     const text = $('seed').value;
-    const count = Number($('count').value);
+    const count = readCount();
+    if (count.value != null) drawCount = count.value;
+    showFieldError('count', count.error);
+    const taxRate = readTax();
+    const newSeed = text !== shownSeed;
     let firstResult = null;
     for (const id of GAME_IDS) {
       const box = $(`${id}-tickets`);
       if (text === '') {
         box.classList.remove('multi');
-        box.innerHTML = `<div class="empty-state">${ghostRow(id)}<p class="empty">Waiting for seed text.</p></div>`;
+        box.innerHTML = `<div class="empty-state">${ghostRow()}<p class="empty">Waiting for seed text.</p></div>`;
       } else {
         try {
-          const result = generate(text, GAMES[id], count);
+          const result = generate(text, GAMES[id], drawCount);
           firstResult = firstResult || result;
           box.classList.toggle('multi', result.tickets.length > 1);
           box.replaceChildren(...ticketRows(id, result.tickets, box));
@@ -619,23 +942,33 @@
         }
       }
       renderJackpot(id);
-      renderRoi(id);
+      renderRoi(id, taxRate);
+      if (newSeed && text !== '' && !reducedMotion.matches) sweep(box.closest('.game'));
     }
-    $('seedOut').replaceChildren(...(firstResult ? [seedView(firstResult.hashHex, text)] : []));
+    renderDrawBar(text, firstResult);
+    shownSeed = text;
     $('clearSeed').hidden = text === '';
     const payoutName = document.querySelector('input[name=payout]:checked').value === 'cash' ? 'Cash' : 'Annuity';
-    $('settingsSummary').textContent = `${$('count').value || '?'} ${count === 1 ? 'ticket' : 'tickets'} · ${payoutName} · tax ${$('fedTax').value || 0}% + ${$('stateTax').value || 0}%`;
+    $('settingsSummary').textContent = `${drawCount} ${drawCount === 1 ? 'ticket' : 'tickets'} · ${payoutName} · tax ${$('fedTax').value || 0}% + ${$('stateTax').value || 0}%`;
     for (const chip of document.querySelectorAll('.chip[data-fill]')) chip.classList.toggle('is-active', text !== '' && chip.dataset.fill === text);
     $('birthdayChip').classList.toggle('is-active', text !== '' && birthdaySeed() === text);
   }
 
-  function ghostRow(id) {
-    const ball = (finish) => `<span class="ball ghost ${finish}">?</span>`;
-    return `<div class="ticket" aria-hidden="true"><div class="balls"><div class="pool">${ball('').repeat(5)}</div><span class="plus">+</span>${ball('')}</div></div>`;
+  // The light runs along the game's colour bar once per new draw.
+  function sweep(card) {
+    card.classList.remove('drawing');
+    void card.offsetWidth;
+    card.classList.add('drawing');
+  }
+
+  function ghostRow() {
+    const ball = '<span class="ball ghost">?</span>';
+    return `<div class="ticket" aria-hidden="true"><div class="balls"><div class="pool">${ball.repeat(5)}</div><span class="plus">+</span>${ball}</div></div>`;
   }
 
   // A row whose numbers have not changed keeps its DOM node and does not replay the draw, so changing the
-  // ticket count only animates the tickets that are new.
+  // ticket count only animates the tickets that are new. Balls land 90 ms apart and later tickets start
+  // 70 ms behind the one before (capped), so even a long draw lands within about 1.5 s.
   function ticketRows(id, tickets, box) {
     const previous = new Map([...box.querySelectorAll('.ticket[data-key]')].map((row) => [row.dataset.key, row]));
     return tickets.map((ticket, t) => {
@@ -653,21 +986,25 @@
       const balls = document.createElement('div');
       balls.className = 'balls';
       balls.setAttribute('aria-hidden', 'true');
+      let k = 0;
       ticket.forEach((pool, p) => {
         if (p) balls.insertAdjacentHTML('beforeend', '<span class="plus">+</span>');
         const group = document.createElement('div');
         group.className = 'pool';
         group.title = pool.label;
-        pool.numbers.forEach((x, i) => {
+        for (const x of pool.numbers) {
+          const slot = document.createElement('span');
+          slot.className = p ? `slot bonus ${BONUS_FINISH[id]}` : 'slot';
+          slot.style.setProperty('--d', `${Math.min(t, 5) * 70 + k++ * 90}ms`);
           const ball = document.createElement('span');
           ball.className = p ? `ball ${BONUS_FINISH[id]}` : 'ball';
-          ball.style.setProperty('--d', `${Math.min(t, 6) * 60 + (p * 5 + i) * 55}ms`);
           const num = document.createElement('span');
           num.className = 'num';
           num.textContent = x;
           ball.append(num);
-          group.append(ball);
-        });
+          slot.append(ball);
+          group.append(slot);
+        }
         balls.append(group);
       });
       row.append(balls);
@@ -675,30 +1012,81 @@
     });
   }
 
-  // The headline jackpot, read back from the assumption fields so an edit shows up here too.
-  function renderJackpot(id) {
-    const annuity = $(`${id}-annuity`).value;
-    const cash = $(`${id}-cash`).value;
-    $(`${id}-jp`).textContent = annuity === '' ? 'Jackpot not set' : `${money(Number(annuity) * 1e6)} jackpot`;
-    const next = DATA && DATA.games && DATA.games[id] && !DATA.games[id].error ? DATA.games[id].nextDrawDate : null;
-    $(`${id}-jpsub`).textContent = [cash === '' ? '' : `${money(Number(cash) * 1e6)} cash`, next ? `draw ${formatDate(next)}` : '']
-      .filter(Boolean).join(' · ');
+  function renderDrawBar(text, result) {
+    const seed = $('drawSeed');
+    seed.textContent = text ? `“${text}”` : 'Type a seed to draw.';
+    seed.classList.toggle('empty', !text);
+    seed.title = text;
+    $('copyNumbers').disabled = !result;
+    $('copyHash').disabled = !result;
+    // Groups of eight are spaced by CSS margins, not characters, so selecting the hash copies it unbroken.
+    $('hash').innerHTML = result
+      ? result.hashHex.match(/.{1,8}/g).map((g) => `<span>${g}</span>`).join('')
+      : 'Type a seed to see its hash.';
   }
 
-  function renderRoi(id) {
+  // The headline jackpot, read back from the assumption fields so an edit shows up here too.
+  function renderJackpot(id) {
+    const annuity = assumeValue(id, 'annuity');
+    const cash = assumeValue(id, 'cash');
+    $(`${id}-jp`).textContent = annuity == null ? 'Jackpot not set' : `${money(annuity * 1e6)} jackpot`;
+    const g = DATA && DATA.games && DATA.games[id] && !DATA.games[id].error ? DATA.games[id] : null;
+    const parts = [];
+    if (cash != null) parts.push(escapeHtml(`${money(cash * 1e6)} cash`));
+    if (g && (g.nextDrawAt || g.nextDrawDate)) {
+      const t = drawTime(g);
+      parts.push(`draw ${escapeHtml(drawLabel(g))}${t != null && t <= Date.now() ? ' <span class="past">drawn</span>' : ''}`);
+    }
+    $(`${id}-jpsub`).innerHTML = parts.join(' · ');
+  }
+
+  // A field's value in millions, or null when it is empty or invalid.
+  function assumeValue(id, field) {
+    const el = $(`${id}-${field}`);
+    if (el.value === '' || el.validity.badInput) return null;
+    const n = Number(el.value);
+    return n >= 0 ? n : null;
+  }
+
+  // Marks the assumption fields that cannot be used and says why, and shows whether they differ from today's.
+  function checkAssumptions(id) {
+    let message = '';
+    for (const [field, name] of ASSUME_FIELDS) {
+      const el = $(`${id}-${field}`);
+      const bad = el.validity.badInput ? `${name}: enter a number.` : el.value !== '' && !(Number(el.value) >= 0) ? `${name} must be 0 or more.` : '';
+      if (bad) el.setAttribute('aria-invalid', 'true');
+      else el.removeAttribute('aria-invalid');
+      message = message || bad;
+    }
+    $(`${id}-assumeError`).hidden = !message;
+    $(`${id}-assumeError`).textContent = message;
+    if (message) $(`${id}-assume`).open = true;
+    const f = fetched[id];
+    const edited = !!f && ASSUME_FIELDS.some(([field]) => {
+      const now = $(`${id}-${field}`).value;
+      return (now === '') !== (f[field] === '') || (now !== '' && Number(now) !== Number(f[field]));
+    });
+    $(`${id}-edited`).hidden = !edited;
+    $(`${id}-reset`).disabled = !edited;
+  }
+
+  function renderRoi(id, taxRate) {
+    checkAssumptions(id);
     const out = $(`${id}-roi`);
     const payout = document.querySelector('input[name=payout]:checked').value;
-    const millions = (field) => ($(`${id}-${field}`).value === '' ? null : Number($(`${id}-${field}`).value) * 1e6);
+    const millions = (field) => { const v = assumeValue(id, field); return v == null ? null : v * 1e6; };
     const advertised = millions('annuity');
     const cash = millions('cash');
     const sold = millions('sold');
     const jackpot = payout === 'cash' ? cash : advertised;
-    if (advertised == null || jackpot == null) {
-      out.innerHTML = `<p class="empty">Enter the jackpot${payout === 'cash' ? ' and its cash value' : ''} to price a ticket.</p>`;
+    if (taxRate == null) {
+      out.innerHTML = '<p class="empty waiting">Fix the tax rate in Settings to price a ticket.</p>';
       return;
     }
-    // An empty tax field counts as 0%, as its placeholder shows.
-    const taxRate = (Number($('fedTax').value || 0) + Number($('stateTax').value || 0)) / 100;
+    if (advertised == null || jackpot == null) {
+      out.innerHTML = `<p class="empty waiting">Enter the jackpot${payout === 'cash' ? ' and its cash value' : ''} to price a ticket.</p>`;
+      return;
+    }
     let results;
     try {
       results = PLAYS[id].map((play) => ({ play, r: expectedReturn({ play, jackpot, advertisedJackpot: advertised, ticketsSold: sold, taxRate }) }));
@@ -723,10 +1111,10 @@
     out.innerHTML = `
       <div class="roi-tiles">${results.map(({ play, r }) => roiTile(play, r)).join('')}</div>
       <div class="rows" style="grid-template-columns: 1fr${' auto'.repeat(cols)}; margin-top: var(--s-4)">
-        ${cols > 1 ? row('', results.map(({ play }) => `<span class="h">${PLAY_NAMES[play]}</span>`)) : ''}
+        ${cols > 1 ? row('', results.map(({ play }) => `<span class="h">${PLAY_NAMES[play]}</span>`), 'hd') : ''}
         ${row('Back per play, after tax', results.map(({ r }) => money(r.expected)))}
         ${row('From fixed prizes', results.map(({ r }) => money(r.fixedPrizes)))}
-        ${row('Average multiplier on them', results.map(({ r }) => `${round(r.multiplier, 2)}x`), 'sub')}
+        ${row('Average multiplier on them', results.map(({ r }) => `${r.multiplier.toFixed(1)}x`), 'sub')}
         ${row('From the jackpot', results.map(({ r }) => money(r.jackpotPart)))}
         ${rule}
         ${row('Break-even jackpot, at today’s sales', results.map(({ r }) => { const b = breakEven(r).asJackpot; return b == null ? 'n/a' : money(b); }))}
@@ -766,43 +1154,39 @@
     return pct === 0 ? 'even' : roi < 0 ? 'loss' : 'gain';
   }
 
-  function seedView(hashHex, text) {
-    const card = document.createElement('section');
-    card.className = 'card seed';
-    card.setAttribute('aria-labelledby', 'seedTitle');
-    // Groups of eight are spaced by CSS margins, not characters, so selecting the hash copies it unbroken.
-    const groups = hashHex.match(/.{1,8}/g).map((g) => `<span>${g}</span>`).join('');
-    card.innerHTML = `
-      <h2 id="seedTitle">Check the draw</h2>
-      <div class="seed-main">
-        <span class="eyebrow" id="hashLabel" style="margin:0">SHA-256 seed</span>
-        <div class="hash" aria-labelledby="hashLabel">${groups}</div>
-        <p class="hint">Check it in a terminal: <code>printf '%s' '…your text…' | shasum -a 256</code></p>
-      </div>
-      <div class="actions">
-        <button type="button" class="btn primary" data-copy="numbers">Copy numbers</button>
-        <button type="button" class="btn" data-copy="hash">Copy hash</button>
-      </div>`;
-    card.addEventListener('click', async (e) => {
-      const button = e.target.closest('[data-copy]');
-      if (!button) return;
-      const which = button.dataset.copy;
-      const numbers = () => GAME_IDS.map((id) => {
-        const { tickets } = generate(text, GAMES[id], Number($('count').value));
-        return `${GAMES[id].name}\n` + tickets.map((t) => t.map((p) => `${p.label}: ${p.numbers.join(' ')}`).join('  |  ')).join('\n');
-      }).join('\n\n');
-      try {
-        await navigator.clipboard.writeText(which === 'hash' ? hashHex : `"${text}"\n\n${numbers()}`);
-        flash(button, 'Copied');
-      } catch {
-        flash(button, 'Copy blocked');
-      }
-    });
-    return card;
+  // ---------- Copying ----------
+
+  $('copyNumbers').addEventListener('click', (e) => {
+    const text = $('seed').value;
+    if (!text) return;
+    const numbers = GAME_IDS.map((id) => {
+      const { tickets } = generate(text, GAMES[id], drawCount);
+      return `${GAMES[id].name}\n` + tickets.map((t) => t.map((p) => `${p.label}: ${p.numbers.join(' ')}`).join('  |  ')).join('\n');
+    }).join('\n\n');
+    copy(e.currentTarget, `"${text}"\n\n${numbers}`);
+  });
+  $('copyHash').addEventListener('click', (e) => {
+    const text = $('seed').value;
+    if (text) copy(e.currentTarget, generate(text, GAMES.powerball, 1).hashHex);
+  });
+  async function copy(button, value) {
+    try {
+      await navigator.clipboard.writeText(value);
+      flash(button, 'Copied');
+    } catch {
+      flash(button, 'Copy blocked');
+    }
   }
+  $('howToggle').addEventListener('click', () => {
+    const open = $('how').hidden;
+    $('how').hidden = !open;
+    $('howToggle').setAttribute('aria-expanded', String(open));
+  });
+
+  // ---------- Formatting ----------
 
   function money(x) {
-    if (x >= 1e9) return `$${round(x / 1e9, 2)}B`;
+    if (x >= 1e9) return `$${(x / 1e9).toFixed(2)}B`;
     if (x >= 1e6) return `$${round(x / 1e6, 1)}M`;
     if (x >= 1000) return `$${Math.round(x).toLocaleString('en-US')}`;
     return `$${x.toFixed(2)}`;
@@ -812,48 +1196,133 @@
     return Number(x.toFixed(places)).toLocaleString('en-US', { maximumFractionDigits: places });
   }
 
-  // Mega Millions gives "2026-10-06", Powerball "Wed, Oct 7, 2026"; show both the second way.
+  // Mega Millions gives "2026-10-06", Powerball "Wed, Oct 7, 2026". Anything else is unreadable: null.
+  function parseDrawDate(s) {
+    if (typeof s !== 'string') return null;
+    const text = s.trim();
+    let y, m, d, x;
+    if ((x = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text))) {
+      [y, m, d] = [+x[1], +x[2], +x[3]];
+    } else if ((x = /^(?:[A-Za-z]+,?\s+)?([A-Za-z]{3,})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(text))) {
+      m = MONTH_KEYS.indexOf(x[1].slice(0, 3).toLowerCase()) + 1;
+      [d, y] = [+x[2], +x[3]];
+      if (!m) return null;
+    } else {
+      return null;
+    }
+    const check = new Date(Date.UTC(y, m - 1, d));
+    if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d) return null;
+    return { y, m, d };
+  }
+
+  // The instant of a wall-clock time in New York, daylight saving included.
+  function easternInstant(y, m, d, hour, minute) {
+    const wall = Date.UTC(y, m - 1, d, hour, minute);
+    try {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+      });
+      const offset = (t) => {
+        const p = Object.fromEntries(fmt.formatToParts(t).map((part) => [part.type, part.value]));
+        return Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute) - t;
+      };
+      return wall - offset(wall - offset(wall));
+    } catch {
+      // No time zone data: assume daylight time, the earlier of the two, so a draw is never called later than it is.
+      return wall + 4 * 3600e3;
+    }
+  }
+
+  // Every date on the page is written the US way, whatever the browser's own locale.
   function formatDate(s) {
-    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
-    if (!iso) return s || 'unknown';
-    return new Date(+iso[1], iso[2] - 1, +iso[3]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const d = parseDrawDate(s);
+    if (!d) return s || 'unknown';
+    return formatDay(new Date(d.y, d.m - 1, d.d), true);
+  }
+  function formatDay(date, weekday = false) {
+    return date.toLocaleDateString('en-US', { ...(weekday ? { weekday: 'short' } : {}), month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function formatStamp(date) {
+    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
   }
 
   function flash(button, label) {
     if (button.dataset.label == null) button.dataset.label = button.textContent;
     button.textContent = label;
+    button.classList.remove('copied');
+    void button.offsetWidth;
+    button.classList.add('copied');
     clearTimeout(button._flash);
-    button._flash = setTimeout(() => (button.textContent = button.dataset.label), 1200);
+    button._flash = setTimeout(() => { button.textContent = button.dataset.label; button.classList.remove('copied'); }, 1200);
   }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   }
 
-  // Grow the textarea with its content instead of scrolling inside it.
+  // ---------- The seed box ----------
+
+  // Grow the textarea to fit its content, or its placeholder when empty, instead of scrolling inside it.
   function autoGrow() {
-    $('seed').style.height = 'auto';
-    $('seed').style.height = $('seed').scrollHeight + 4 + 'px';
+    const el = $('seed');
+    const empty = el.value === '';
+    if (empty) el.value = el.placeholder;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 4 + 'px';
+    if (empty) el.value = '';
   }
+  // Refit when the box changes width: a resize, a rotation, or the layout settling on load.
+  let seedWidth = 0;
+  new ResizeObserver(() => {
+    const w = $('seed').clientWidth;
+    if (w !== seedWidth) { seedWidth = w; autoGrow(); }
+  }).observe($('seed'));
 
   function setSeed(text) {
     $('seed').value = text;
     autoGrow();
     render();
+    const seed = $('drawSeed');
+    seed.classList.remove('fresh');
+    void seed.offsetWidth;
+    seed.classList.add('fresh');
   }
 
-  // Dates are written the US way, month/day/year with no leading zeros (10/9/2026), as people here type
-  // them. The seed is the exact text, so the chips must always write a date the same way.
-  const usDate = (y, m, d) => `${m}/${d}/${y}`;
+  // Bring the draw into view when it is below the fold (a phone, mostly), so a chip or Return shows the result.
+  function revealDraw() {
+    const firstRow = document.querySelector('#powerball-tickets .ticket');
+    const viewHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const barTop = $('drawBar').getBoundingClientRect().top;
+    if (firstRow && barTop >= 0 && firstRow.getBoundingClientRect().bottom <= viewHeight) return;
+    $('drawBar').scrollIntoView({ block: 'start', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+  }
+
+  // Return finishes the seed rather than adding a line break, which would change every number. On a phone
+  // it closes the keyboard. Shift+Return still types a line break for anyone who wants one in the seed.
+  $('seed').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    $('seed').blur();
+    revealDraw();
+  });
+  // Closing a phone keyboard some other way after typing also shows the draw.
+  let seedAtFocus = '';
+  $('seed').addEventListener('focus', () => { seedAtFocus = $('seed').value; });
+  $('seed').addEventListener('blur', (e) => {
+    if (coarsePointer.matches && !e.relatedTarget && $('seed').value && $('seed').value !== seedAtFocus) revealDraw();
+  });
+
+  // Dates are written the US way by prng.js's usDate (10/9/2026), where a test pins the format: the seed is
+  // the exact text, so the chips must always write a date the same way.
   const now = new Date();
   const today = usDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
   $('todayChip').dataset.fill = today;
   $('todayText').textContent = today;
   for (const chip of document.querySelectorAll('.chip[data-fill]')) {
-    chip.addEventListener('click', () => { closeBirthday(); setSeed(chip.dataset.fill); });
+    chip.addEventListener('click', () => { closeBirthday(); setSeed(chip.dataset.fill); revealDraw(); });
   }
 
-  // Birthday: month, day and year menus. Picking a full date fills the seed straight away, and clicking the
+  // Birthday: month, day and year menus. Picking a full date fills the seed straight away, and opening the
   // chip again fills it again, so a birthday can be re-picked after choosing something else.
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const fillSelect = (sel, placeholder, options) => {
@@ -863,11 +1332,14 @@
   };
   fillSelect($('bdayMonth'), 'Month', MONTHS.map((name, i) => [i + 1, name]));
   fillSelect($('bdayYear'), 'Year', Array.from({ length: now.getFullYear() - 1899 }, (_, i) => now.getFullYear() - i).map((y) => [y, y]));
+  // Day 0 of the next month is the last day of this one; with no month or year yet, allow 31 (or 29 for
+  // February). A day past the new month's end becomes its last day, so the birthday stays complete.
   function fillDays() {
-    // Day 0 of the next month is the last day of this one; with no month or year yet, allow 31 (or 29 for February).
     const m = Number($('bdayMonth').value), y = Number($('bdayYear').value);
     const last = m ? new Date(y || 2000, m, 0).getDate() : 31;
+    const day = Number($('bdayDay').value);
     fillSelect($('bdayDay'), 'Day', Array.from({ length: last }, (_, i) => [i + 1, i + 1]));
+    if (day) $('bdayDay').value = String(Math.min(day, last));
   }
   fillDays();
   function birthdaySeed() {
@@ -884,24 +1356,42 @@
     $('birthdayText').textContent = seed || '';
     if (seed) setSeed(seed);
   }
+  // Opening the picker re-applies a picked birthday; tapping the chip to close it only closes it.
   $('birthdayChip').addEventListener('click', () => {
     const opening = $('bdayPanel').hidden;
     openBirthday(opening);
+    if (!opening) return;
     if (birthdaySeed()) applyBirthday();
-    if (opening) $('bdayMonth').focus();
+    $('bdayMonth').focus();
   });
   for (const id of ['bdayMonth', 'bdayYear']) $(id).addEventListener('change', () => { fillDays(); applyBirthday(); });
   $('bdayDay').addEventListener('change', applyBirthday);
-  $('bdayDone').addEventListener('click', () => { closeBirthday(); $('birthdayChip').focus(); });
+  $('bdayDone').addEventListener('click', () => { closeBirthday(); $('birthdayChip').focus(); if (birthdaySeed()) revealDraw(); });
   $('clearSeed').addEventListener('click', () => { setSeed(''); $('seed').focus(); });
 
+  // ---------- Settings ----------
+
   function stepCount(delta) {
-    const current = Number($('count').value) || 1;
-    $('count').value = Math.min(100, Math.max(1, Math.round(current) + delta));
+    $('count').value = Math.min(100, Math.max(1, drawCount + delta));
+    const el = $('count');
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
     render();
   }
   $('countDown').addEventListener('click', () => stepCount(-1));
   $('countUp').addEventListener('click', () => stepCount(1));
+  // Leaving the field settles it on a count it can draw: empty goes back to the draw on screen, and
+  // anything out of range or fractional comes back to the nearest whole number from 1 to 100.
+  $('count').addEventListener('blur', () => {
+    const el = $('count');
+    const n = Number(el.value);
+    const settled = el.value === '' || el.validity.badInput || !Number.isFinite(n) ? drawCount : Math.min(100, Math.max(1, Math.round(n)));
+    if (el.value !== String(settled) || el.validity.badInput) {
+      el.value = settled;
+      render();
+    }
+  });
 
   // Open on anything wider than a phone; the summary line is hidden there, so it cannot be folded away by accident.
   const phone = window.matchMedia('(max-width: 560px)');
@@ -910,7 +1400,11 @@
 
   $('seed').addEventListener('input', autoGrow);
   for (const el of document.querySelectorAll('#seed, .settings input, .assume input')) el.addEventListener('input', render);
+  updateStatus();
   render();
+  autoGrow();
+  // A page left open across a draw time goes stale on its own.
+  setInterval(() => { updateStatus(); GAME_IDS.forEach(renderJackpot); }, 60e3);
 </script>
 </body>
 </html>
