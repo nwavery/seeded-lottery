@@ -1118,7 +1118,7 @@
         ${row('From the jackpot', results.map(({ r }) => money(r.jackpotPart)))}
         ${rule}
         ${row('Break-even jackpot, at today’s sales', results.map(({ r }) => { const b = breakEven(r).asJackpot; return b == null ? 'n/a' : money(b); }))}
-        ${row('as cash value', results.map(({ r }) => { const b = breakEven(r).asCash; return b == null ? 'n/a' : money(b); }), 'sub')}
+        ${row('cash option at that jackpot', results.map(({ r }) => { const b = breakEven(r).asCash; return b == null ? 'n/a' : money(b); }), 'sub')}
       </div>
       <p class="shared" style="margin-top: var(--s-3)">
         If you win, you keep ${Math.round(results[0].r.jackpotShare * 100)}% of the jackpot on average${sold == null ? ' (sales unknown, so assuming no other winners)' : `, with ${round(sold / 1e6, 1)}M plays projected`}.
