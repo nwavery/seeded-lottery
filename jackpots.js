@@ -1,21 +1,21 @@
 // Written by fetch-jackpots.js; rerun it to refresh.
 window.JACKPOTS = {
-  "fetchedAt": "2026-10-10T15:54:14.341Z",
+  "fetchedAt": "2026-10-11T16:21:23.701Z",
   "games": {
     "powerball": {
-      "lastDrawDate": "Wed, Oct 7, 2026",
-      "nextDrawDate": "Sat, Oct 10, 2026",
-      "nextDrawAt": "2026-10-11T02:59:00.000Z",
+      "lastDrawDate": "Sat, Oct 10, 2026",
+      "nextDrawDate": "Mon, Oct 12, 2026",
+      "nextDrawAt": "2026-10-13T02:59:00.000Z",
       "last": {
-        "annuity": 485000000,
-        "cash": 199700000
+        "annuity": 519000000,
+        "cash": 212900000
       },
       "next": {
-        "annuity": 516000000,
-        "cash": 211600000
+        "annuity": 538000000,
+        "cash": 220600000
       },
-      "estimatedTicketsSold": 18307692,
-      "fetchedAt": "2026-10-10T15:54:14.341Z"
+      "estimatedTicketsSold": 11846154,
+      "fetchedAt": "2026-10-11T16:21:23.701Z"
     },
     "megamillions": {
       "lastDrawDate": "2026-10-09",
@@ -32,7 +32,7 @@ window.JACKPOTS = {
       "lastDrawJackpotWinners": 0,
       "estimatedTicketsSold": 5428882,
       "prizeTableDrift": [],
-      "fetchedAt": "2026-10-10T15:54:14.341Z"
+      "fetchedAt": "2026-10-11T16:21:23.701Z"
     }
   }
 };
